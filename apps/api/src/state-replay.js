@@ -1,0 +1,5 @@
+export class StateReplayService{
+ constructor(pool,stateEngine){this.pool=pool;this.stateEngine=stateEngine;}
+ async rebuildStudent(studentId){const targets=(await this.pool.query(`SELECT DISTINCT target_type,target_id FROM evidences e JOIN evidence_validity v USING(evidence_id) WHERE e.student_id=$1 AND v.status='Valid' ORDER BY target_type,target_id`,[studentId])).rows;const out=[];for(const t of targets){const state=t.target_type==="Knowledge"?await this.stateEngine.rebuildKnowledge(studentId,t.target_id):await this.stateEngine.rebuildAbility(studentId,t.target_id);out.push({target_type:t.target_type,target_id:t.target_id,state});}return out;}
+ async rebuildAll({afterStudentId=null,limit=100}={}){const rows=(await this.pool.query(`SELECT DISTINCT student_id FROM evidences WHERE ($1::uuid IS NULL OR student_id>$1::uuid) ORDER BY student_id LIMIT $2`,[afterStudentId,limit])).rows;const out=[];for(const r of rows)out.push({student_id:r.student_id,targets:await this.rebuildStudent(r.student_id)});return{students:out,next_cursor:rows.length===limit?rows.at(-1).student_id:null};}
+}
