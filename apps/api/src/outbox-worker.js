@@ -1,0 +1,6 @@
+import {randomUUID} from "node:crypto";
+export class OutboxWorker{
+ constructor(pool,evidenceBuilder,{leaseSeconds=60}={}){this.pool=pool;this.evidenceBuilder=evidenceBuilder;this.leaseSeconds=leaseSeconds;}
+ async claimOne(){const token=randomUUID();const q=`WITH candidate AS (SELECT event_id FROM outbox_events WHERE processed_at IS NULL AND (claimed_at IS NULL OR claimed_at < now()-($1::int * interval '1 second')) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE outbox_events o SET claimed_at=now(),claim_token=$2,attempt_count=attempt_count+1 FROM candidate c WHERE o.event_id=c.event_id RETURNING o.*`;return (await this.pool.query(q,[this.leaseSeconds,token])).rows[0]??null;}
+ async processOne(){const e=await this.claimOne();if(!e)return null;try{if(e.event_type==="AttemptRecorded")await this.evidenceBuilder.buildForAttempt(e.aggregate_id);await this.pool.query("UPDATE outbox_events SET processed_at=now(),last_error=NULL WHERE event_id=$1 AND claim_token=$2",[e.event_id,e.claim_token]);return{event_id:e.event_id,status:"Processed"};}catch(err){await this.pool.query("UPDATE outbox_events SET last_error=$3,claimed_at=NULL,claim_token=NULL WHERE event_id=$1 AND claim_token=$2",[e.event_id,e.claim_token,String(err?.message||err).slice(0,1000)]);return{event_id:e.event_id,status:"Retry",error:String(err?.message||err)};}}
+}
