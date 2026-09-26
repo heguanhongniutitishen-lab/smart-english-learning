@@ -1,0 +1,7 @@
+export class ReviewPlanner{
+ constructor(pool,policyKey="default"){this.pool=pool;this.policyKey=policyKey;}
+ async activePolicy(){return (await this.pool.query("SELECT * FROM review_policies WHERE policy_key=$1 AND status='Active' ORDER BY version DESC LIMIT 1",[this.policyKey])).rows[0];}
+ async nextForMastery(m){if(!m.last_evidence_at||m.mastery_state==="S0")return null;const p=await this.activePolicy();if(!p)return null;const days=Number(p.intervals[m.mastery_state]??1);const confidence=Number(m.confidence);const adjusted=confidence<Number(p.confidence_floor)?Math.max(1,Math.ceil(days/2)):days;return new Date(new Date(m.last_evidence_at).getTime()+adjusted*86400000);}
+ async refresh(studentId,knowledgeId){const m=(await this.pool.query("SELECT * FROM mastery_records WHERE student_id=$1 AND knowledge_id=$2",[studentId,knowledgeId])).rows[0];if(!m)return null;const next=await this.nextForMastery(m);return (await this.pool.query("UPDATE mastery_records SET next_review_at=$3,updated_at=now() WHERE student_id=$1 AND knowledge_id=$2 RETURNING *",[studentId,knowledgeId,next])).rows[0];}
+ async due(studentId,at=new Date(),limit=50){return (await this.pool.query("SELECT * FROM mastery_records WHERE student_id=$1 AND next_review_at IS NOT NULL AND next_review_at<=$2 ORDER BY next_review_at,confidence LIMIT $3",[studentId,at,limit])).rows;}
+}
