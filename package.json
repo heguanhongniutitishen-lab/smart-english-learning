@@ -1,0 +1,11 @@
+{
+  "name": "smart-english-learning",
+  "private": true,
+  "version": "0.1.0-alpha",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check apps/api/src/server.js"
+  },
+  "engines": {"node": ">=20"}
+}
