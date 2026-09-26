@@ -1,4 +1,4 @@
-import {randomUUID} from "node:crypto";import {withTransaction} from "../db.js";
+import {randomUUID} from "node:crypto";import {withTransaction} from "./db.js";
 function scores(a){const independent=Math.max(0.2,1-(Number(a.hint_level||0)*0.2)-(Math.max(1,Number(a.attempt_no||1))-1)*0.15);const direction=a.result==="Correct"?"Positive":a.result==="Wrong"?"Negative":"Neutral";const quality=direction==="Neutral"?0:Math.min(1,0.6+independent*0.4);return{independent,direction,quality};}
 export class EvidenceBuilder{
  constructor(pool,modelVersion="rules-v1"){this.pool=pool;this.modelVersion=modelVersion;}
