@@ -1,0 +1,2 @@
+const T={Draft:new Set(["Validating","Cancelled"]),Validating:new Set(["ReadyForReview","Draft","Cancelled"]),ReadyForReview:new Set(["Reviewed","Draft","Cancelled"]),Reviewed:new Set(["Published","Draft"]),Published:new Set([]),Cancelled:new Set([])};
+export function assertImportTransition(from,to){if(!T[from]?.has(to))throw Object.assign(new Error(`invalid import transition ${from} -> ${to}`),{status:409,code:"IMPORT_INVALID_TRANSITION"});return true;}
