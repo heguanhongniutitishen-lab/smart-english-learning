@@ -10,11 +10,11 @@ CREATE TABLE curriculum_knowledge_mappings(
  textbook_id uuid NOT NULL REFERENCES textbooks(textbook_id),
  unit_id uuid REFERENCES units(unit_id),
  section_id uuid REFERENCES sections(section_id),
- knowledge_point_id uuid NOT NULL REFERENCES knowledge_points(knowledge_point_id),
+ knowledge_id uuid NOT NULL REFERENCES knowledge_points(knowledge_id),
  importance varchar(16) NOT NULL DEFAULT 'Standard',
  source varchar(24) NOT NULL DEFAULT 'Research',
  created_at timestamptz NOT NULL DEFAULT now(),
- UNIQUE(textbook_id,section_id,knowledge_point_id)
+ UNIQUE(textbook_id,section_id,knowledge_id)
 );
 
 CREATE TABLE curriculum_ability_mappings(

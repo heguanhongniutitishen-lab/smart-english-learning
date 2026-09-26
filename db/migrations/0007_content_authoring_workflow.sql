@@ -1,11 +1,11 @@
 BEGIN;
-ALTER TABLE content_items ADD COLUMN IF NOT EXISTS lifecycle_status varchar(24) NOT NULL DEFAULT 'Draft';
-ALTER TABLE content_items ADD COLUMN IF NOT EXISTS content_type varchar(32);
-ALTER TABLE content_items ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES users(user_id);
-ALTER TABLE content_versions ADD COLUMN IF NOT EXISTS review_status varchar(24) NOT NULL DEFAULT 'Pending';
+
+
+
+
 ALTER TABLE content_versions ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES users(user_id);
 ALTER TABLE content_versions ADD COLUMN IF NOT EXISTS reviewed_at timestamptz;
-ALTER TABLE content_versions ADD COLUMN IF NOT EXISTS published_at timestamptz;
+
 ALTER TABLE content_versions ADD COLUMN IF NOT EXISTS source_metadata jsonb;
 CREATE TABLE publication_events(
  publication_event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
