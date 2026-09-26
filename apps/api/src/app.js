@@ -1,6 +1,7 @@
 import {randomUUID} from "node:crypto";import {readJson,ok,fail} from "./http.js";import {MemoryStore} from "./store.js";import {IdempotencyStore} from "./idempotency.js";
 export function createHandler(store=new MemoryStore(),idem=new IdempotencyStore(),researchHandler=null,learningRepo=null,dailyPlanHandler=null){return async(req,res)=>{const id=String(req.headers["x-request-id"]||randomUUID());try{const u=new URL(req.url,"http://localhost");
-if(dailyPlanHandler&&u.pathname.includes("/daily-")){const handled=await dailyPlanHandler(req,res,u,id);if(handled!==false)return handled;}\nif(researchHandler&&u.pathname.startsWith("/api/v1/research/")){const handled=await researchHandler(req,res,u,id);if(handled!==false)return handled;}
+if(dailyPlanHandler&&u.pathname.includes("/daily-")){const handled=await dailyPlanHandler(req,res,u,id);if(handled!==false)return handled;}
+if(researchHandler&&u.pathname.startsWith("/api/v1/research/")){const handled=await researchHandler(req,res,u,id);if(handled!==false)return handled;}
 if(req.method==="GET"&&u.pathname==="/health")return ok(res,{status:"ok",service:"smart-english-api"},id);
 if(req.method==="GET"&&u.pathname==="/health/ready"){if(typeof store.health==="function")await store.health();return ok(res,{status:"ready"},id);}
 if(req.method==="POST"&&u.pathname==="/api/v1/auth/wechat/login"){const b=await readJson(req);if(!b.open_id)return fail(res,400,"AUTH_OPEN_ID_REQUIRED","open_id is required",id);const z=await store.loginWechat(String(b.open_id));return ok(res,{user_id:z.user_id,status:z.status},id);}
