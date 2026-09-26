@@ -1,0 +1,4 @@
+import test from "node:test";import assert from "node:assert/strict";import {createResearchHandler} from "../src/research-routes.js";
+function response(){return {statusCode:0,headers:{},setHeader(k,v){this.headers[k]=v;},end(v){this.body=v;}};}
+test("research routes require actor",async()=>{const h=createResearchHandler({});const res=response();assert.equal(await h({method:"POST",headers:{},url:"" },res,new URL("http://x/api/v1/research/knowledge-points"),"r1"),false);});
+test("knowledge creation validates required fields",async()=>{const h=createResearchHandler({createKnowledge:async x=>x});const req={method:"POST",headers:{"x-user-id":"u1"},[Symbol.asyncIterator]:async function*(){yield Buffer.from('{"code":"K1"}');}};const res=response();await h(req,res,new URL("http://x/api/v1/research/knowledge-points"),"r1");assert.equal(res.statusCode,400);});
