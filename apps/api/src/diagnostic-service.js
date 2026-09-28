@@ -1,0 +1,9 @@
+export class DiagnosticPolicyService{
+ constructor(pool){this.pool=pool;}
+ async resolve(studentId){const s=(await this.pool.query("SELECT current_stage,current_grade FROM students WHERE student_id=$1",[studentId])).rows[0];if(!s)throw Object.assign(new Error("STUDENT_NOT_FOUND"),{code:"STUDENT_NOT_FOUND",status:404});const p=(await this.pool.query(`SELECT * FROM diagnostic_policies WHERE status='Active' AND (stage IS NULL OR stage=$1) AND (grade_min IS NULL OR grade_min<=$2) AND (grade_max IS NULL OR grade_max>=$2) ORDER BY (stage IS NOT NULL) DESC,(grade_min IS NOT NULL) DESC,version DESC LIMIT 1`,[s.current_stage,s.current_grade])).rows[0];if(!p)throw Object.assign(new Error("DIAGNOSTIC_POLICY_NOT_FOUND"),{code:"DIAGNOSTIC_POLICY_NOT_FOUND",status:409});return p;}
+}
+export class DiagnosticSessionService{
+ constructor(pool,policyService){this.pool=pool;this.policyService=policyService;}
+ async start(studentId,onboardingProfileId=null){const existing=(await this.pool.query("SELECT * FROM diagnostic_sessions WHERE student_id=$1 AND status='Active' ORDER BY started_at DESC LIMIT 1",[studentId])).rows[0];if(existing)return{session:existing,reused:true};const p=await this.policyService.resolve(studentId);const s=(await this.pool.query("INSERT INTO diagnostic_sessions(student_id,onboarding_profile_id,policy_key,policy_version) VALUES($1,$2,$3,$4) RETURNING *",[studentId,onboardingProfileId,p.policy_key,p.version])).rows[0];return{session:s,reused:false};}
+ async complete(sessionId,reason="STOP_RULE_MET"){return (await this.pool.query("UPDATE diagnostic_sessions SET status='Completed',completed_at=COALESCE(completed_at,now()),stop_reason=COALESCE(stop_reason,$2) WHERE diagnostic_session_id=$1 AND status IN ('Active','Completed') RETURNING *",[sessionId,reason])).rows[0]??null;}
+}
