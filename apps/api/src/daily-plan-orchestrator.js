@@ -1,0 +1,6 @@
+import {validateReplanReason} from "./replan-trigger.js";
+export class DailyPlanOrchestrator{
+ constructor({pool,candidateBuilder,policyService,scheduler,replanService}){this.pool=pool;this.candidateBuilder=candidateBuilder;this.policyService=policyService;this.scheduler=scheduler;this.replanService=replanService;}
+ async active(studentId,planDate){return (await this.pool.query("SELECT * FROM daily_plans WHERE student_id=$1 AND plan_date=$2 AND status='Active' ORDER BY version DESC LIMIT 1",[studentId,planDate])).rows[0]??null;}
+ async build(studentId,planDate,{at=new Date(planDate+"T12:00:00Z"),reason=null}={}){const [candidates,policy,active]=await Promise.all([this.candidateBuilder.build(studentId,at),this.policyService.resolve(studentId,at),this.active(studentId,planDate)]);const allocationPolicy={minimum_share:policy.minimum_share},strategyVersion=policy.policy_key+"@"+policy.version;if(!active)return this.scheduler.generate(studentId,planDate,candidates,allocationPolicy,{strategyVersion});if(!reason)return{plan:active,reused:true,candidate_count:candidates.length};validateReplanReason(reason);return this.replanService.replan(studentId,planDate,candidates,{reason,policy:allocationPolicy,strategyVersion});}
+}

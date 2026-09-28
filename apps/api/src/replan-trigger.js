@@ -1,0 +1,3 @@
+export const REPLAN_REASONS=Object.freeze({SCHOOL_PROGRESS_CHANGED:"SCHOOL_PROGRESS_CHANGED",AVAILABLE_TIME_CHANGED:"AVAILABLE_TIME_CHANGED",URGENT_SCHOOL_TASK:"URGENT_SCHOOL_TASK",NEW_HIGH_PRIORITY_WEAKNESS:"NEW_HIGH_PRIORITY_WEAKNESS",EXAM_WINDOW_CHANGED:"EXAM_WINDOW_CHANGED",MANUAL_REFRESH:"MANUAL_REFRESH"});
+export function validateReplanReason(reason){if(!Object.values(REPLAN_REASONS).includes(reason))throw new Error("INVALID_REPLAN_REASON");return reason;}
+export function shouldReplan(event){return Object.values(REPLAN_REASONS).includes(event?.type);}
