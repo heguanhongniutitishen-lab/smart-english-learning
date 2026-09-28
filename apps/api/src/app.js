@@ -1,5 +1,6 @@
 import {randomUUID} from "node:crypto";import {readJson,ok,fail} from "./http.js";import {MemoryStore} from "./store.js";import {IdempotencyStore} from "./idempotency.js";
-export function createHandler(store=new MemoryStore(),idem=new IdempotencyStore(),researchHandler=null,learningRepo=null,dailyPlanHandler=null){return async(req,res)=>{const id=String(req.headers["x-request-id"]||randomUUID());try{const u=new URL(req.url,"http://localhost");
+export function createHandler(store=new MemoryStore(),idem=new IdempotencyStore(),researchHandler=null,learningRepo=null,dailyPlanHandler=null,diagnosticHandler=null){return async(req,res)=>{const id=String(req.headers["x-request-id"]||randomUUID());try{const u=new URL(req.url,"http://localhost");
+if(diagnosticHandler&&(u.pathname.includes("/diagnostic")||u.pathname.endsWith("/onboarding"))){const handled=await diagnosticHandler(req,res,u,id);if(handled!==false)return handled;}
 if(dailyPlanHandler&&u.pathname.includes("/daily-")){const handled=await dailyPlanHandler(req,res,u,id);if(handled!==false)return handled;}
 if(researchHandler&&u.pathname.startsWith("/api/v1/research/")){const handled=await researchHandler(req,res,u,id);if(handled!==false)return handled;}
 if(req.method==="GET"&&u.pathname==="/health")return ok(res,{status:"ok",service:"smart-english-api"},id);
