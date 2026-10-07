@@ -56,3 +56,17 @@ it("keeps missing downstream Evidence visible in measurement completeness",async
   assert.equal(z.data_completeness.attempts,1);assert.equal(z.data_completeness.technical_ok_without_evidence,1);assert.equal(z.data_completeness.complete,false);
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
 });
+
+
+it("measurement excludes facts outside the Pilot membership lifecycle",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('measurement-window','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'measurement-window') RETURNING cohort_id",["MW-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id,enrolled_at,ended_at,status) VALUES($1,$2,'2026-10-05T00:00:00Z','2026-10-06T00:00:00Z','Completed')",[cohort,s]);
+  const item=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
+  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[item])).rows[0].content_version_id;
+  for(const at of ["2026-10-04T23:00:00Z","2026-10-05T12:00:00Z","2026-10-06T01:00:00Z"])await c.query("INSERT INTO question_attempts(student_id,content_version_id,request_id,answer_payload,result,occurred_at) VALUES($1,$2,$3,'{}','Correct',$4)",[s,cv,crypto.randomUUID(),at]);
+  const z=await new PilotMeasurementReadModel(c).baseline(cohort,{from:"2026-10-04",to:"2026-10-06"});assert.equal(z.attempts.total,1);assert.equal(z.data_completeness.attempts,1);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
