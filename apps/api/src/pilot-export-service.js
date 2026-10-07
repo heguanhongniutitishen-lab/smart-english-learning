@@ -8,7 +8,7 @@ export class PilotExportService{
    t.source_type task_source_type,t.target_type task_target_type,t.target_id task_target_id
    FROM pilot_cohort_memberships m JOIN question_attempts a ON a.student_id=m.student_id
    LEFT JOIN daily_tasks t ON t.daily_task_id=a.daily_task_id LEFT JOIN daily_plans p ON p.daily_plan_id=t.daily_plan_id
-   WHERE m.cohort_id=$1 AND ($2::uuid IS NULL OR a.attempt_id>$2::uuid)
+   WHERE m.cohort_id=$1 AND a.occurred_at>=m.enrolled_at AND (m.ended_at IS NULL OR a.occurred_at<m.ended_at) AND ($2::uuid IS NULL OR a.attempt_id>$2::uuid)
    ORDER BY a.attempt_id LIMIT $3`,[cohortId,after,n]);
   return{dataset:"attempts",snapshot_semantics:"durable_facts_with_plan_provenance",rows:r.rows,next_cursor:r.rows.length===n?r.rows.at(-1).attempt_id:null};
  }
@@ -32,22 +32,25 @@ export class PilotExportService{
   const n=Math.min(Math.max(Number(limit)||500,1),2000);
   const r=await this.pool.query(`SELECT e.evidence_id,e.student_id,e.attempt_id,e.target_type,e.target_id,e.direction,e.quality_score,e.independence_score,e.difficulty_factor,e.confidence_delta,e.source,e.model_version,e.created_at,v.status validity_status,v.reason_code validity_reason_code,v.invalidated_at,v.recalc_required
    FROM pilot_cohort_memberships m JOIN evidences e ON e.student_id=m.student_id LEFT JOIN evidence_validity v USING(evidence_id)
-   WHERE m.cohort_id=$1 AND ($2::uuid IS NULL OR e.evidence_id>$2::uuid) ORDER BY e.evidence_id LIMIT $3`,[cohortId,after,n]);
+   WHERE m.cohort_id=$1 AND e.created_at>=m.enrolled_at AND (m.ended_at IS NULL OR e.created_at<m.ended_at) AND ($2::uuid IS NULL OR e.evidence_id>$2::uuid) ORDER BY e.evidence_id LIMIT $3`,[cohortId,after,n]);
   return{dataset:"evidence",snapshot_semantics:"durable_evidence_with_current_validity",rows:r.rows,next_cursor:r.rows.length===n?r.rows.at(-1).evidence_id:null};
  }
  async feedback(cohortId,{limit=500,after=null}={}){
-  const n=Math.min(Math.max(Number(limit)||500,1),2000);
+  const n=Math.min(Math.max(Number(limit)||500,1),2000),z=after?JSON.parse(Buffer.from(after,"base64url").toString("utf8")):null,zero="00000000-0000-0000-0000-000000000000";
   const r=await this.pool.query(`SELECT o.error_observation_id,o.student_id,o.attempt_id,o.content_version_id,o.observation_type,o.status observation_status,o.source observation_source,o.created_at,
    h.error_cause_hypothesis_id,h.cause_code,h.confidence hypothesis_confidence,h.status hypothesis_status,h.source hypothesis_source,h.created_at hypothesis_created_at,h.verified_at
    FROM pilot_cohort_memberships m JOIN error_observations o ON o.student_id=m.student_id LEFT JOIN error_cause_hypotheses h USING(error_observation_id)
-   WHERE m.cohort_id=$1 AND ($2::uuid IS NULL OR o.error_observation_id>$2::uuid) ORDER BY o.error_observation_id,h.error_cause_hypothesis_id NULLS FIRST LIMIT $3`,[cohortId,after,n]);
-  return{dataset:"feedback",snapshot_semantics:"observations_and_hypotheses_confidence_is_heuristic_not_probability",rows:r.rows,next_cursor:r.rows.length===n?r.rows.at(-1).error_observation_id:null};
+   WHERE m.cohort_id=$1 AND o.created_at>=m.enrolled_at AND (m.ended_at IS NULL OR o.created_at<m.ended_at)
+   AND ($2::uuid IS NULL OR o.error_observation_id>$2::uuid OR (o.error_observation_id=$2::uuid AND COALESCE(h.error_cause_hypothesis_id,$4::uuid)>$3::uuid))
+   ORDER BY o.error_observation_id,COALESCE(h.error_cause_hypothesis_id,$4::uuid) LIMIT $5`,[cohortId,z?.observation_id??null,z?.hypothesis_id??zero,zero,n]);
+  const last=r.rows.at(-1),next_cursor=r.rows.length===n?Buffer.from(JSON.stringify({observation_id:last.error_observation_id,hypothesis_id:last.error_cause_hypothesis_id??zero})).toString("base64url"):null;
+  return{dataset:"feedback",snapshot_semantics:"observations_and_hypotheses_confidence_is_heuristic_not_probability",rows:r.rows,next_cursor};
  }
  async repairs(cohortId,{limit=500,after=null}={}){
   const n=Math.min(Math.max(Number(limit)||500,1),2000);
   const r=await this.pool.query(`SELECT r.micro_repair_task_id,r.student_id,r.error_observation_id,r.error_cause_hypothesis_id,r.target_type,r.target_id,r.repair_type,r.status,r.priority,r.estimated_seconds,r.return_policy,r.created_at,r.completed_at
    FROM pilot_cohort_memberships m JOIN micro_repair_tasks r ON r.student_id=m.student_id
-   WHERE m.cohort_id=$1 AND ($2::uuid IS NULL OR r.micro_repair_task_id>$2::uuid) ORDER BY r.micro_repair_task_id LIMIT $3`,[cohortId,after,n]);
+   WHERE m.cohort_id=$1 AND r.created_at>=m.enrolled_at AND (m.ended_at IS NULL OR r.created_at<m.ended_at) AND ($2::uuid IS NULL OR r.micro_repair_task_id>$2::uuid) ORDER BY r.micro_repair_task_id LIMIT $3`,[cohortId,after,n]);
   return{dataset:"repairs",snapshot_semantics:"durable_repair_workflow_facts",rows:r.rows,next_cursor:r.rows.length===n?r.rows.at(-1).micro_repair_task_id:null};
  }
 }
