@@ -65,3 +65,12 @@ test("Pilot cohort API rejects ResearchEditor",async()=>{
  const x=jsonReq("GET","/api/v1/research/pilot/cohorts/c1/members",undefined,"ResearchEditor"),h=createResearchHandler(x.repo,{pilotCohorts:{listMembers:async()=>[]}});
  await assert.rejects(()=>h(x.req,response(),x.url,"p5"),e=>e.code==="AUTH_PILOT_ADMIN_FORBIDDEN");
 });
+
+
+test("Pilot measurement API forwards explicit period and remains Pilot-admin only",async()=>{
+ let seen=null;const pilotMeasurement={baseline:async(c,q)=>(seen={c,q},{semantics:{measurement:"operational_baseline_not_validated_learning_impact"},data_completeness:{complete:true}})};
+ let x=jsonReq("GET","/api/v1/research/pilot/cohorts/c1/measurement?from=2026-10-01&to=2026-10-07");let h=createResearchHandler(x.repo,{pilotMeasurement}),res=response();
+ await h(x.req,res,x.url,"pm1");assert.equal(res.statusCode,200);assert.deepEqual(seen,{c:"c1",q:{from:"2026-10-01",to:"2026-10-07"}});
+ x=jsonReq("GET","/api/v1/research/pilot/cohorts/c1/measurement?from=2026-10-01&to=2026-10-07",undefined,"ResearchEditor");h=createResearchHandler(x.repo,{pilotMeasurement});
+ await assert.rejects(()=>h(x.req,response(),x.url,"pm2"),e=>e.code==="AUTH_PILOT_ADMIN_FORBIDDEN");
+});
