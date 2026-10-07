@@ -2,10 +2,17 @@
   "name": "smart-english-learning",
   "private": true,
   "version": "0.1.0-alpha",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check apps/api/src/server.js"
+    "check": "node --check apps/api/src/server.js",
+    "student-demo": "npm start --workspace=@sel/student-web",
+    "check:student": "npm run check --workspace=@sel/student-web"
   },
-  "engines": {"node": ">=20"}
+  "engines": {
+    "node": ">=20"
+  }
 }
