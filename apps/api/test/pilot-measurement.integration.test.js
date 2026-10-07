@@ -41,3 +41,18 @@ it("counts technical attempts separately from correct/wrong and keeps repair flo
   assert.equal(z.error_repair.observations,1);assert.equal(z.error_repair.wrong_answer_observations,1);assert.equal(z.error_repair.repairs_total,1);assert.equal(z.error_repair.repairs_completed,1);
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
 });
+
+
+it("keeps missing downstream Evidence visible in measurement completeness",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('gap-private','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'gap') RETURNING cohort_id",["GAP-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  const item=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
+  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[item])).rows[0].content_version_id;
+  await c.query("INSERT INTO question_attempts(student_id,content_version_id,request_id,answer_payload,result,technical_status,occurred_at) VALUES($1,$2,$3,'{}','Correct','OK','2026-10-05T03:00:00Z')",[s,cv,crypto.randomUUID()]);
+  const z=await new PilotMeasurementReadModel(c).baseline(cohort,{from:"2026-10-05",to:"2026-10-05"});
+  assert.equal(z.data_completeness.attempts,1);assert.equal(z.data_completeness.technical_ok_without_evidence,1);assert.equal(z.data_completeness.complete,false);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
