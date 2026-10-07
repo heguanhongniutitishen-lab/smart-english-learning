@@ -15,4 +15,5 @@ export class PilotCohortService{
    FROM pilot_cohort_memberships m JOIN students s USING(student_id)
    WHERE m.cohort_id=$1 ORDER BY m.enrolled_at,m.membership_id LIMIT $2 OFFSET $3`,[cohortId,n,o]);return r.rows;
  }
+ async endMembership(cohortId,studentId,status){if(!["Withdrawn","Completed"].includes(status))throw Object.assign(new Error("invalid membership status"),{status:400,code:"PILOT_MEMBERSHIP_STATUS_INVALID"});const r=await this.pool.query("UPDATE pilot_cohort_memberships SET status=$3,ended_at=now() WHERE cohort_id=$1 AND student_id=$2 AND status='Enrolled' RETURNING membership_id,cohort_id,student_id,status,enrolled_at,ended_at",[cohortId,studentId,status]);return r.rows[0]??null;}
 }
