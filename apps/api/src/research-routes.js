@@ -1,8 +1,10 @@
 import {readJson,ok,fail} from "./http.js";import {requireResearchRole,requireStudentStateRole} from "./authz.js";import {ResearchAdminService} from "./research-admin.js";import {CurriculumMappingService} from "./curriculum-mapping.js";
-export function createResearchHandler(repo,{studentState=null}={}){
+export function createResearchHandler(repo,{studentState=null,reliabilityOps=null,recoveryIntegrity=null}={}){
  const imports=new ResearchAdminService(repo),maps=new CurriculumMappingService(repo);
  return async function research(req,res,u,id){
   const actor=String(req.headers["x-user-id"]||"");const reviewPath=/\/(approve|publish)$/.test(u.pathname)||/\/review$/.test(u.pathname);await requireResearchRole(repo,actor,{review:reviewPath});
+  if(req.method==="GET"&&u.pathname==="/api/v1/research/ops/reliability"&&reliabilityOps){await requireStudentStateRole(repo,actor);return ok(res,await reliabilityOps.get(),id);}
+  if(req.method==="GET"&&u.pathname==="/api/v1/research/ops/recovery-readiness"&&recoveryIntegrity){await requireStudentStateRole(repo,actor);const z=await recoveryIntegrity.check();return ok(res,{ready:z.ok,...z},id);}
   let studentMatch=u.pathname.match(/^\/api\/v1\/research\/students\/([^/]+)\/state$/);if(req.method==="GET"&&studentMatch&&studentState){await requireStudentStateRole(repo,actor);const z=await studentState.get(studentMatch[1]);return z?ok(res,z,id):fail(res,404,"RESEARCH_STUDENT_NOT_FOUND","student not found",id);}
   if(req.method==="POST"&&u.pathname==="/api/v1/research/knowledge-points"){const b=await readJson(req);if(!b.code||!b.name||!b.domain||!b.stage)return fail(res,400,"KNOWLEDGE_INVALID","code, name, domain and stage are required",id);return ok(res,await repo.createKnowledge(b),id,201);}
   if(req.method==="POST"&&u.pathname==="/api/v1/research/abilities"){const b=await readJson(req);if(!b.code||!b.name||!b.domain||!b.stage)return fail(res,400,"ABILITY_INVALID","code, name, domain and stage are required",id);return ok(res,await repo.createAbility(b),id,201);}

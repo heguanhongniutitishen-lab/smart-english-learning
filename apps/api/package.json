@@ -1,8 +1,17 @@
 {
-  "name":"@sel/api",
-  "version":"0.1.0",
-  "private":true,
-  "type":"module",
-  "scripts":{"start":"node src/server.js","migrate":"node scripts/migrate.js","test":"node --test","check":"node --check src/app.js && node --check src/server.js"},
-  "dependencies":{"pg":"^8.13.1"}
+  "name": "@sel/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "migrate": "node scripts/migrate.js",
+    "test": "node --test",
+    "check": "node --check src/app.js && node --check src/server.js",
+    "recovery:check": "node scripts/recovery.js",
+    "recovery:replay": "node scripts/recovery.js --apply"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
 }
