@@ -28,7 +28,7 @@ export class RecoveryIntegrityService{
     count(*) FILTER(WHERE dead_lettered_at IS NOT NULL)::int dead_letter FROM outbox_events`)
   ]);
   const details={evidence:evidenceValidity.rows[0],mastery:mastery.rows[0],ability:ability.rows[0],recalculation:recalc.rows[0],outbox:outbox.rows[0]};
-  const blockers=Number(details.evidence.missing_validity)+Number(details.mastery.missing_projection)+Number(details.mastery.count_mismatch)+Number(details.ability.missing_projection)+Number(details.ability.count_mismatch)+Number(details.recalculation.missing_jobs)+Number(details.recalculation.completed_but_required);
+  const blockers=Number(details.evidence.missing_validity)+Number(details.mastery.missing_projection)+Number(details.mastery.count_mismatch)+Number(details.ability.missing_projection)+Number(details.ability.count_mismatch)+Number(details.recalculation.missing_jobs)+Number(details.recalculation.completed_but_required)+Number(details.outbox.dead_letter);
   return{ok:blockers===0,blockers,details};
  }
 }
