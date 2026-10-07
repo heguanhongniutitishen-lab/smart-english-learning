@@ -1,10 +1,11 @@
 import {readJson,ok,fail} from "./http.js";import {requireResearchRole,requireStudentStateRole,requirePilotAdminRole} from "./authz.js";import {ResearchAdminService} from "./research-admin.js";import {CurriculumMappingService} from "./curriculum-mapping.js";
-export function createResearchHandler(repo,{studentState=null,reliabilityOps=null,recoveryIntegrity=null,pilotCohorts=null,pilotReadiness=null}={}){
+export function createResearchHandler(repo,{studentState=null,reliabilityOps=null,recoveryIntegrity=null,pilotCohorts=null,pilotReadiness=null,pilotExport=null}={}){
  const imports=new ResearchAdminService(repo),maps=new CurriculumMappingService(repo);
  return async function research(req,res,u,id){
   const actor=String(req.headers["x-user-id"]||"");const reviewPath=/\/(approve|publish)$/.test(u.pathname)||/\/review$/.test(u.pathname);await requireResearchRole(repo,actor,{review:reviewPath});
   if(req.method==="GET"&&u.pathname==="/api/v1/research/ops/reliability"&&reliabilityOps){await requireStudentStateRole(repo,actor);return ok(res,await reliabilityOps.get(),id);}
   if(req.method==="GET"&&u.pathname==="/api/v1/research/ops/recovery-readiness"&&recoveryIntegrity){await requireStudentStateRole(repo,actor);const z=await recoveryIntegrity.check();return ok(res,{ready:z.ok,...z},id);}
+  let exportMatch=u.pathname.match(/^\/api\/v1\/research\/pilot\/cohorts\/([^/]+)\/export\/(attempts|state)$/);if(req.method==="GET"&&exportMatch&&pilotExport){await requirePilotAdminRole(repo,actor);const z=exportMatch[2]==="attempts"?await pilotExport.attempts(exportMatch[1],{limit:u.searchParams.get("limit"),after:u.searchParams.get("after")}):await pilotExport.state(exportMatch[1],{limit:u.searchParams.get("limit"),afterStudent:u.searchParams.get("after_student")});return ok(res,z,id);}
   let readinessMatch=u.pathname.match(/^\/api\/v1\/research\/pilot\/cohorts\/([^/]+)\/readiness$/);if(req.method==="GET"&&readinessMatch&&pilotReadiness){await requirePilotAdminRole(repo,actor);const z=await pilotReadiness.get(readinessMatch[1]);return z?ok(res,z,id):fail(res,404,"PILOT_COHORT_NOT_FOUND","cohort not found",id);}\n  if(pilotCohorts){
    let pm;
    if(req.method==="POST"&&u.pathname==="/api/v1/research/pilot/cohorts"){await requirePilotAdminRole(repo,actor);const b=await readJson(req);if(!b.cohort_code||!b.name)return fail(res,400,"PILOT_COHORT_INVALID","cohort_code and name are required",id);return ok(res,await pilotCohorts.create(b,actor),id,201);}
