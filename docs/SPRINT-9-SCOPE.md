@@ -1,6 +1,6 @@
 # Sprint 9 Scope — Reliability + Data
 
-Status: FREEZE CANDIDATE
+Status: FROZEN
 Branch: `sprint-9/reliability-data`
 Base: Sprint 8 freeze `8e5b769f6eb70340c8a4c100ebf37183b4d56b04`
 
@@ -8,7 +8,7 @@ Base: Sprint 8 freeze `8e5b769f6eb70340c8a4c100ebf37183b4d56b04`
 Harden the existing learning loop for Pilot 0. Sprint 9 is a reliability/data sprint, not a feature-expansion sprint.
 
 ## P0
-Status: COMPLETE pending final CI confirmation.\n\n1. Durable Evidence invalidation -> state recalculation workflow.
+Status: COMPLETE.\n\n1. Durable Evidence invalidation -> state recalculation workflow.
 2. Outbox retry policy with bounded backoff and dead-letter visibility without starving fresh events.
 3. Close or explicitly harden the persistent Idempotency-Key business-commit crash window.
 4. Correct semantic misuse of content mapping weight as `difficulty_factor` without changing frozen learning formulas.
@@ -16,7 +16,7 @@ Status: COMPLETE pending final CI confirmation.\n\n1. Durable Evidence invalidat
 6. Operational read surface for failed/dead-letter/recalculation work needed for Pilot support.
 
 ## P1
-Status: COMPLETE pending final CI confirmation.\n\n- tighten StateReplay valid-evidence targeting
+Status: COMPLETE.\n\n- tighten StateReplay valid-evidence targeting
 - repair replay response consistency
 - data integrity checks and readiness report
 - indexes only when justified by measured/query-plan need
@@ -52,7 +52,7 @@ Sprint 9 must not change without explicit review:
 8. Sprint 9 freeze
 
 ## Exit
-Freeze candidate audit completed. Final freeze requires the latest branch HEAD CI to be green.\n\nSprint 9 freezes only when:
+Freeze audit completed. Final candidate HEAD `513de9850ac38b643760ed4c704da45f7cfe5163` passed CI run #168. Sprint 9 is frozen; any further scope change requires a new sprint or explicit unfreeze review.\n\nSprint 9 freezes only when:
 - all P0 reliability paths have PostgreSQL integration coverage
 - failure/retry behavior is explicit and observable
 - no confirmed P0/P1 data-integrity defect remains
