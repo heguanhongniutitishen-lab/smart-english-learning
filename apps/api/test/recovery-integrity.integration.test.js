@@ -46,3 +46,17 @@ it("detects evidence without validity metadata as a recovery blocker",async()=>{
   assert.ok(Number(result.details.evidence.missing_validity)>=1);
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
 });
+
+
+it("treats unresolved outbox dead letters as recovery readiness blockers",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL});
+ const c=await p.connect();
+ try{
+  await c.query("BEGIN");
+  await c.query("INSERT INTO outbox_events(event_type,aggregate_type,aggregate_id,payload,dead_lettered_at,dead_letter_reason,attempt_count) VALUES('RecoveryDeadLetter','Test',gen_random_uuid(),'{}',now(),'rehearsal unresolved',8)");
+  const result=await new RecoveryIntegrityService(c).check();
+  assert.equal(result.ok,false);
+  assert.ok(Number(result.details.outbox.dead_letter)>=1);
+  assert.ok(result.blockers>=1);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
