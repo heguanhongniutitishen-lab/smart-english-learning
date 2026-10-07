@@ -34,8 +34,8 @@ it("counts technical attempts separately from correct/wrong and keeps repair flo
   const item=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
   const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[item])).rows[0].content_version_id;
   const a=(await c.query("INSERT INTO question_attempts(student_id,content_version_id,request_id,answer_payload,result,technical_status,occurred_at) VALUES($1,$2,$3,'{}','Wrong','OK','2026-10-05T03:00:00Z') RETURNING attempt_id",[s,cv,crypto.randomUUID()])).rows[0].attempt_id;
-  const o=(await c.query("INSERT INTO error_observations(student_id,attempt_id,content_version_id,observation_type) VALUES($1,$2,$3,'WrongAnswer') RETURNING error_observation_id",[s,a,cv])).rows[0].error_observation_id;
-  await c.query("INSERT INTO micro_repair_tasks(student_id,error_observation_id,target_type,target_id,repair_type,status,estimated_seconds) VALUES($1,$2,'Knowledge',gen_random_uuid(),'Explain','Completed',60)",[s,o]);
+  const o=(await c.query("INSERT INTO error_observations(student_id,attempt_id,content_version_id,observation_type,created_at) VALUES($1,$2,$3,'WrongAnswer','2026-10-05T03:01:00Z') RETURNING error_observation_id",[s,a,cv])).rows[0].error_observation_id;
+  await c.query("INSERT INTO micro_repair_tasks(student_id,error_observation_id,target_type,target_id,repair_type,status,estimated_seconds,created_at,completed_at) VALUES($1,$2,'Knowledge',gen_random_uuid(),'Explain','Completed',60,'2026-10-05T03:02:00Z','2026-10-05T03:03:00Z')",[s,o]);
   const z=await new PilotMeasurementReadModel(c).baseline(cohort,{from:"2026-10-05",to:"2026-10-05"});
   assert.deepEqual(z.attempts,{total:1,technical_ok:1,correct:0,wrong:1});
   assert.equal(z.error_repair.observations,1);assert.equal(z.error_repair.wrong_answer_observations,1);assert.equal(z.error_repair.repairs_total,1);assert.equal(z.error_repair.repairs_completed,1);
