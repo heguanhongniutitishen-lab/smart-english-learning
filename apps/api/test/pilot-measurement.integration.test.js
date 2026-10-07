@@ -9,7 +9,7 @@ it("reports Pilot operational exposure and completion without impact claims",asy
  try{await c.query("BEGIN");
   const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('measure-private','Primary',5) RETURNING student_id")).rows[0].student_id;
   const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'measure') RETURNING cohort_id",["MEAS-"+crypto.randomUUID()])).rows[0].cohort_id;
-  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id,enrolled_at) VALUES($1,$2,'2026-10-05T00:00:00Z')",[cohort,s]);
   await c.query("INSERT INTO learning_sessions(student_id,started_at,ended_at,effective_seconds,status) VALUES($1,'2026-10-05T02:00:00Z','2026-10-05T02:10:00Z',480,'Completed')",[s]);
   const plan=(await c.query("INSERT INTO daily_plans(student_id,plan_date,version,status,available_minutes,strategy_version) VALUES($1,'2026-10-05',1,'Active',20,'scheduler-v1') RETURNING daily_plan_id",[s])).rows[0].daily_plan_id;
   await c.query("INSERT INTO daily_tasks(daily_plan_id,source_type,target_type,estimated_seconds,priority,sort_order,reason_code,status) VALUES($1,'SchoolSync','Knowledge',60,1,1,'Pilot','Completed'),($1,'Review','Knowledge',60,2,2,'Pilot','Pending')",[plan]);
@@ -30,7 +30,7 @@ it("counts technical attempts separately from correct/wrong and keeps repair flo
  try{await c.query("BEGIN");
   const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('flow-private','Primary',5) RETURNING student_id")).rows[0].student_id;
   const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'flow') RETURNING cohort_id",["FLOW-"+crypto.randomUUID()])).rows[0].cohort_id;
-  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id,enrolled_at) VALUES($1,$2,'2026-10-05T00:00:00Z')",[cohort,s]);
   const item=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
   const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[item])).rows[0].content_version_id;
   const a=(await c.query("INSERT INTO question_attempts(student_id,content_version_id,request_id,answer_payload,result,technical_status,occurred_at) VALUES($1,$2,$3,'{}','Wrong','OK','2026-10-05T03:00:00Z') RETURNING attempt_id",[s,cv,crypto.randomUUID()])).rows[0].attempt_id;
@@ -48,7 +48,7 @@ it("keeps missing downstream Evidence visible in measurement completeness",async
  try{await c.query("BEGIN");
   const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('gap-private','Primary',5) RETURNING student_id")).rows[0].student_id;
   const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'gap') RETURNING cohort_id",["GAP-"+crypto.randomUUID()])).rows[0].cohort_id;
-  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id,enrolled_at) VALUES($1,$2,'2026-10-05T00:00:00Z')",[cohort,s]);
   const item=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
   const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[item])).rows[0].content_version_id;
   await c.query("INSERT INTO question_attempts(student_id,content_version_id,request_id,answer_payload,result,technical_status,occurred_at) VALUES($1,$2,$3,'{}','Correct','OK','2026-10-05T03:00:00Z')",[s,cv,crypto.randomUUID()]);
