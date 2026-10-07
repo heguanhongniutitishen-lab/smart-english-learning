@@ -9,3 +9,5 @@ export async function requireResearchRole(repo,userId,{review=false}={}){
 }
 
 export async function requireStudentStateRole(repo,userId){if(!userId)throw Object.assign(new Error("authentication required"),{status:401,code:"AUTH_REQUIRED"});const roles=await repo.listUserRoles(userId);if(!roles.some(r=>["PlatformAdmin","ResearchAdmin"].includes(r)))throw Object.assign(new Error("student state permission required"),{status:403,code:"AUTH_STUDENT_STATE_FORBIDDEN"});return roles;}
+
+export async function requirePilotAdminRole(repo,userId){if(!userId)throw Object.assign(new Error("authentication required"),{status:401,code:"AUTH_REQUIRED"});const roles=await repo.listUserRoles(userId);if(!roles.some(r=>["PlatformAdmin","ResearchAdmin"].includes(r)))throw Object.assign(new Error("pilot admin permission required"),{status:403,code:"AUTH_PILOT_ADMIN_FORBIDDEN"});return roles;}
