@@ -19,8 +19,8 @@ test("reliability ops route requires student-state role and returns operational 
 });
 
 test("reliability ops route rejects research actor without student-state permission",async()=>{
- const repo={listUserRoles:async()=>["ResearchAdmin"]};
+ const repo={listUserRoles:async()=>["ResearchEditor"]};
  const h=createResearchHandler(repo,{reliabilityOps:{get:async()=>({})}});
  const req={method:"GET",headers:{"x-user-id":"u1"}},res=response();
- await assert.rejects(()=>h(req,res,new URL("http://x/api/v1/research/ops/reliability"),"ops-2"),x=>x.code==="FORBIDDEN");
+ await assert.rejects(()=>h(req,res,new URL("http://x/api/v1/research/ops/reliability"),"ops-2"),x=>x.code==="AUTH_STUDENT_STATE_FORBIDDEN");
 });
