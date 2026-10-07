@@ -1,0 +1,31 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import pg from "pg";
+import {PilotExportService} from "../src/pilot-export-service.js";
+const it=process.env.TEST_DATABASE_URL?test:test.skip;
+
+it("exports Pilot attempts with version provenance and no direct identity fields",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('private-name','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'export') RETURNING cohort_id",["EXP-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  const content=(await c.query("INSERT INTO contents(content_type,status) VALUES('Question','Active') RETURNING content_id")).rows[0].content_id;
+  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,status) VALUES($1,1,'{}','Published') RETURNING content_version_id",[content])).rows[0].content_version_id;
+  const plan=(await c.query("INSERT INTO daily_plans(student_id,plan_date,version,status,available_minutes,strategy_version) VALUES($1,current_date,1,'Active',20,'scheduler-v1') RETURNING daily_plan_id",[s])).rows[0].daily_plan_id;
+  const task=(await c.query("INSERT INTO daily_tasks(daily_plan_id,source_type,target_type,estimated_seconds,priority,sort_order,reason_code) VALUES($1,'SchoolSync','Knowledge',60,1,1,'Pilot') RETURNING daily_task_id",[plan])).rows[0].daily_task_id;
+  await c.query("INSERT INTO question_attempts(student_id,daily_task_id,content_version_id,request_id,answer_payload,result,occurred_at) VALUES($1,$2,$3,$4,'{}','Correct',now())",[s,task,cv,crypto.randomUUID()]);
+  const z=await new PilotExportService(c).attempts(cohort);assert.equal(z.dataset,"attempts");assert.equal(z.rows.length,1);assert.equal(z.rows[0].strategy_version,"scheduler-v1");
+  for(const k of ["display_name","mobile_hash","wechat_open_id","answer_payload"])assert.equal(k in z.rows[0],false);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
+
+it("labels state export explicitly as a current projection snapshot",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('state-private','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'state') RETURNING cohort_id",["ST-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  const z=await new PilotExportService(c).state(cohort);assert.equal(z.snapshot_semantics,"current_projection_not_historical_period_state");
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
