@@ -11,8 +11,8 @@ export class StudentTaskContentReadModel{
    WHERE ci.current_version_id=cv.content_version_id AND ci.status='Published'
    AND cv.review_status='Approved' AND cv.reviewed_by IS NOT NULL AND cv.published_at IS NOT NULL`;
   let q,params;
-  if(task.target_type==="Knowledge"){q=base+` AND EXISTS(SELECT 1 FROM content_knowledge ck WHERE ck.content_version_id=cv.content_version_id AND ck.knowledge_id=$3 AND ck.review_status='Approved' AND ck.role<>'ContextOnly') ORDER BY cv.published_at DESC LIMIT 1`;params=[taskId,studentId,task.target_id];}
-  else if(task.target_type==="Ability"){q=base+` AND EXISTS(SELECT 1 FROM content_ability ca WHERE ca.content_version_id=cv.content_version_id AND ca.ability_id=$3) ORDER BY cv.published_at DESC LIMIT 1`;params=[taskId,studentId,task.target_id];}
+  if(task.target_type==="Knowledge"){q=base+` AND EXISTS(SELECT 1 FROM content_knowledge ck WHERE ck.content_version_id=cv.content_version_id AND ck.knowledge_id=$1 AND ck.review_status='Approved' AND ck.role<>'ContextOnly') ORDER BY cv.published_at DESC LIMIT 1`;params=[task.target_id];}
+  else if(task.target_type==="Ability"){q=base+` AND EXISTS(SELECT 1 FROM content_ability ca WHERE ca.content_version_id=cv.content_version_id AND ca.ability_id=$1) ORDER BY cv.published_at DESC LIMIT 1`;params=[task.target_id];}
   else return{task,content:null,reason:"TARGET_CONTENT_NOT_DIRECTLY_MAPPED"};
   const row=(await this.pool.query(q,params)).rows[0]??null;
   return{task,content:row,reason:row?null:"NO_APPROVED_PUBLISHED_CONTENT"};
