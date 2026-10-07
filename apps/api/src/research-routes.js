@@ -1,9 +1,9 @@
-import {readJson,ok,fail} from "./http.js";import {requireResearchRole} from "./authz.js";import {ResearchAdminService} from "./research-admin.js";import {CurriculumMappingService} from "./curriculum-mapping.js";
+import {readJson,ok,fail} from "./http.js";import {requireResearchRole,requireStudentStateRole} from "./authz.js";import {ResearchAdminService} from "./research-admin.js";import {CurriculumMappingService} from "./curriculum-mapping.js";
 export function createResearchHandler(repo,{studentState=null}={}){
  const imports=new ResearchAdminService(repo),maps=new CurriculumMappingService(repo);
  return async function research(req,res,u,id){
   const actor=String(req.headers["x-user-id"]||"");const reviewPath=/\/(approve|publish)$/.test(u.pathname)||/\/review$/.test(u.pathname);await requireResearchRole(repo,actor,{review:reviewPath});
-  let studentMatch=u.pathname.match(/^\/api\/v1\/research\/students\/([^/]+)\/state$/);if(req.method==="GET"&&studentMatch&&studentState){const z=await studentState.get(studentMatch[1]);return z?ok(res,z,id):fail(res,404,"RESEARCH_STUDENT_NOT_FOUND","student not found",id);}
+  let studentMatch=u.pathname.match(/^\/api\/v1\/research\/students\/([^/]+)\/state$/);if(req.method==="GET"&&studentMatch&&studentState){await requireStudentStateRole(repo,actor);const z=await studentState.get(studentMatch[1]);return z?ok(res,z,id):fail(res,404,"RESEARCH_STUDENT_NOT_FOUND","student not found",id);}
   if(req.method==="POST"&&u.pathname==="/api/v1/research/knowledge-points"){const b=await readJson(req);if(!b.code||!b.name||!b.domain||!b.stage)return fail(res,400,"KNOWLEDGE_INVALID","code, name, domain and stage are required",id);return ok(res,await repo.createKnowledge(b),id,201);}
   if(req.method==="POST"&&u.pathname==="/api/v1/research/abilities"){const b=await readJson(req);if(!b.code||!b.name||!b.domain||!b.stage)return fail(res,400,"ABILITY_INVALID","code, name, domain and stage are required",id);return ok(res,await repo.createAbility(b),id,201);}
   if(req.method==="POST"&&u.pathname==="/api/v1/research/content"){const b=await readJson(req);if(!b.content_type||!b.payload)return fail(res,400,"CONTENT_INVALID","content_type and payload are required",id);return ok(res,await repo.createContent(b,actor),id,201);}
