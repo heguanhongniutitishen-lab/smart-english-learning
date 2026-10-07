@@ -24,3 +24,15 @@ test("Pilot admin boundary allows only PlatformAdmin and ResearchAdmin",async()=
  for(const role of ["PlatformAdmin","ResearchAdmin"])await assert.doesNotReject(()=>requirePilotAdminRole({listUserRoles:async()=>[role]},"u"));
  for(const role of ["ResearchEditor","ResearchReviewer"])await assert.rejects(()=>requirePilotAdminRole({listUserRoles:async()=>[role]},"u"),x=>x.code==="AUTH_PILOT_ADMIN_FORBIDDEN");
 });
+
+
+it("does not reactivate a terminal Pilot membership in place",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('history-private','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const service=new PilotCohortService(c),cohort=await service.create({cohort_code:"HIST-"+crypto.randomUUID(),name:"history"},null);
+  await service.enroll(cohort.cohort_id,s,null);await service.endMembership(cohort.cohort_id,s,"Completed");
+  await assert.rejects(()=>service.enroll(cohort.cohort_id,s,null),e=>e.code==="PILOT_MEMBERSHIP_EXISTS"&&e.status===409);
+  const rows=await service.listMembers(cohort.cohort_id,{});assert.equal(rows.length,1);assert.equal(rows[0].status,"Completed");assert.ok(rows[0].ended_at);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
