@@ -1,0 +1,10 @@
+export class GrowthReadModel{
+ constructor(pool){this.pool=pool;}
+ async summary(studentId,{from,to}={}){const end=to||new Date().toISOString().slice(0,10),start=from||new Date(Date.parse(end+"T00:00:00Z")-6*86400000).toISOString().slice(0,10);const [sessions,tasks,mastery,due,attempts]=await Promise.all([
+ this.pool.query("SELECT COALESCE(sum(effective_seconds),0)::bigint seconds,count(*)::int sessions FROM learning_sessions WHERE student_id=$1 AND started_at >= $2::date AND started_at < ($3::date + interval '1 day') AND status<>'Active'",[studentId,start,end]),
+ this.pool.query(`SELECT count(*)::int total,count(*) FILTER(WHERE t.status='Completed')::int completed,COALESCE(sum(t.estimated_seconds) FILTER(WHERE t.status='Completed'),0)::bigint completed_seconds FROM daily_tasks t JOIN daily_plans p ON p.daily_plan_id=t.daily_plan_id WHERE p.student_id=$1 AND p.plan_date BETWEEN $2::date AND $3::date AND p.status='Active'`,[studentId,start,end]),
+ this.pool.query("SELECT mastery_state,count(*)::int n FROM mastery_records WHERE student_id=$1 GROUP BY mastery_state",[studentId]),
+ this.pool.query("SELECT count(*)::int n FROM mastery_records WHERE student_id=$1 AND next_review_at IS NOT NULL AND next_review_at <= now()",[studentId]),
+ this.pool.query(`SELECT count(*)::int total,count(*) FILTER(WHERE result='Correct' AND technical_status='OK')::int correct,count(*) FILTER(WHERE result='Wrong' AND technical_status='OK')::int wrong FROM question_attempts WHERE student_id=$1 AND occurred_at >= $2::date AND occurred_at < ($3::date + interval '1 day')`,[studentId,start,end])
+ ]);const m={S0:0,S1:0,S2:0,S3:0,S4:0};for(const r of mastery.rows)m[r.mastery_state]=Number(r.n);const s=sessions.rows[0],t=tasks.rows[0],a=attempts.rows[0];return{period:{from:start,to:end},learning:{effective_seconds:Number(s.seconds),session_count:Number(s.sessions)},tasks:{total:Number(t.total),completed:Number(t.completed),completed_estimated_seconds:Number(t.completed_seconds)},mastery:m,review:{due_count:Number(due.rows[0].n)},attempts:{total:Number(a.total),correct:Number(a.correct),wrong:Number(a.wrong)}};}
+}
