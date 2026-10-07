@@ -1,6 +1,6 @@
 # Sprint 10 Scope — Pilot 0 Readiness + Measurement
 
-Status: ACTIVE
+Status: FREEZE CANDIDATE
 Branch: `sprint-10/pilot-readiness-measurement`
 Base: Sprint 9 freeze `b4e6cd790105fbe60be24b09fe1e52bf140fd15f`
 
@@ -55,3 +55,32 @@ Sprint 10 freezes only when:
 - PostgreSQL integration tests and CI are green.
 
 Do not merge without explicit approval.
+
+
+## Freeze candidate
+- Candidate HEAD: `f7c1d12f1c1697e6b7bc77e2129b201c3b0df1e7`
+- Blocking CI: GitHub Actions run #197 — SUCCESS
+- Base remains Sprint 9 freeze `b4e6cd790105fbe60be24b09fe1e52bf140fd15f`
+- PR #10 remains Draft and MUST NOT be merged without explicit approval.
+
+### Exit audit
+- Cohort isolation uses minimal identifiers and membership lifecycle boundaries.
+- Attempt, Evidence, Feedback and Repair exports are scoped to membership lifecycle; state export is explicitly a current projection.
+- Feedback pagination uses an Observation + Hypothesis composite cursor so joined rows are not skipped across pages.
+- Pilot readiness and measurement keep pre-enrollment/post-membership durable facts out of Pilot-period counts.
+- Missing/broken provenance remains visible; no silent imputation was introduced.
+- Operational metrics remain explicitly non-validated learning-impact measurements.
+- PostgreSQL integration coverage is blocking and the candidate HEAD passed CI.
+
+### Frozen-boundary confirmation
+Sprint 10 does not change S0-S4 thresholds, confidence decay, Ability scoring, Review intervals, Scheduler weights/shares, Diagnostic calibration, ErrorCause verification semantics, MicroRepair pedagogy/default limits, or long-term state ownership.
+
+### Known non-blocking debt
+- Diagnostic dimension taxonomy remains free-string governance debt.
+- RepeatedWrong recurrence remains content-version recurrence rather than semantic-knowledge recurrence.
+- State export remains current projection, not historical period-end state.
+- Review `due_current_snapshot` remains a current snapshot and MUST NOT be represented as historical adherence.
+- Pilot membership currently rejects re-enrollment of the same student into the same cohort instead of creating multiple membership episodes; changing that requires reviewed schema evolution.
+- Offset pagination remains acceptable for Pilot-scale membership listing.
+
+No additional Sprint 10 scope should be added after this candidate without explicitly reopening the sprint.
