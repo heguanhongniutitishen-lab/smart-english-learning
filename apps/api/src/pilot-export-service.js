@@ -30,7 +30,7 @@ export class PilotExportService{
  }
  async evidence(cohortId,{limit=500,after=null}={}){
   const n=Math.min(Math.max(Number(limit)||500,1),2000);
-  const r=await this.pool.query(`SELECT e.evidence_id,e.student_id,e.attempt_id,e.target_type,e.target_id,e.direction,e.quality_score,e.independence_score,e.difficulty_factor,e.confidence_delta,e.source,e.model_version,e.created_at,v.status validity_status,v.reason validity_reason,v.updated_at validity_updated_at
+  const r=await this.pool.query(`SELECT e.evidence_id,e.student_id,e.attempt_id,e.target_type,e.target_id,e.direction,e.quality_score,e.independence_score,e.difficulty_factor,e.confidence_delta,e.source,e.model_version,e.created_at,v.status validity_status,v.reason_code validity_reason_code,v.invalidated_at,v.recalc_required
    FROM pilot_cohort_memberships m JOIN evidences e ON e.student_id=m.student_id LEFT JOIN evidence_validity v USING(evidence_id)
    WHERE m.cohort_id=$1 AND ($2::uuid IS NULL OR e.evidence_id>$2::uuid) ORDER BY e.evidence_id LIMIT $3`,[cohortId,after,n]);
   return{dataset:"evidence",snapshot_semantics:"durable_evidence_with_current_validity",rows:r.rows,next_cursor:r.rows.length===n?r.rows.at(-1).evidence_id:null};
