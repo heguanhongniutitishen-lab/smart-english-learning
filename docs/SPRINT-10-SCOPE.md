@@ -1,6 +1,6 @@
 # Sprint 10 Scope — Pilot 0 Readiness + Measurement
 
-Status: FREEZE CANDIDATE
+Status: FROZEN
 Branch: `sprint-10/pilot-readiness-measurement`
 Base: Sprint 9 freeze `b4e6cd790105fbe60be24b09fe1e52bf140fd15f`
 
@@ -58,8 +58,10 @@ Do not merge without explicit approval.
 
 
 ## Freeze candidate
-- Candidate HEAD: `f7c1d12f1c1697e6b7bc77e2129b201c3b0df1e7`
+- Functional candidate HEAD: `f7c1d12f1c1697e6b7bc77e2129b201c3b0df1e7`
+- Freeze-document HEAD before final status commit: `44060b3fa9be95cd25fa3b582092d46632fb046c`
 - Blocking CI: GitHub Actions run #197 — SUCCESS
+- Freeze-document CI: GitHub Actions run #198 — SUCCESS
 - Base remains Sprint 9 freeze `b4e6cd790105fbe60be24b09fe1e52bf140fd15f`
 - PR #10 remains Draft and MUST NOT be merged without explicit approval.
 
@@ -83,4 +85,4 @@ Sprint 10 does not change S0-S4 thresholds, confidence decay, Ability scoring, R
 - Pilot membership currently rejects re-enrollment of the same student into the same cohort instead of creating multiple membership episodes; changing that requires reviewed schema evolution.
 - Offset pagination remains acceptable for Pilot-scale membership listing.
 
-No additional Sprint 10 scope should be added after this candidate without explicitly reopening the sprint.
+Sprint 10 is FROZEN. No additional Sprint 10 scope should be added without explicitly reopening the sprint.
