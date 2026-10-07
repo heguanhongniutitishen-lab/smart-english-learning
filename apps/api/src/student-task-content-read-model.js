@@ -5,7 +5,7 @@ export class StudentTaskContentReadModel{
    FROM daily_tasks t JOIN daily_plans p USING(daily_plan_id)
    WHERE t.daily_task_id=$1 AND p.student_id=$2 AND p.status='Active' LIMIT 1`,[taskId,studentId])).rows[0];
   if(!task)return null;
-  const base=`SELECT cv.content_version_id,ci.content_type,cv.payload,cv.answer_payload,cv.explanation_payload,
+  const base=`SELECT cv.content_version_id,ci.content_type,cv.payload,
    cv.difficulty_label,cv.estimated_seconds
    FROM content_versions cv JOIN content_items ci ON ci.content_id=cv.content_id
    WHERE ci.current_version_id=cv.content_version_id AND ci.status='Published'
