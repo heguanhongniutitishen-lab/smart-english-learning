@@ -56,3 +56,33 @@ it("state export cursor does not duplicate rows",async()=>{
   assert.equal(a.rows.length,1);assert.equal(b.rows.length,1);assert.notEqual(a.rows[0].target_id,b.rows[0].target_id);
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
 });
+
+
+it("feedback cursor does not skip hypotheses from the same observation",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('feedback-cursor','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'feedback-cursor') RETURNING cohort_id",["FC-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id,enrolled_at) VALUES($1,$2,'2026-10-05T00:00:00Z')",[cohort,s]);
+  const item=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
+  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[item])).rows[0].content_version_id;
+  const a=(await c.query("INSERT INTO question_attempts(student_id,content_version_id,request_id,answer_payload,result,occurred_at) VALUES($1,$2,$3,'{}','Wrong','2026-10-05T01:00:00Z') RETURNING attempt_id",[s,cv,crypto.randomUUID()])).rows[0].attempt_id;
+  const o=(await c.query("INSERT INTO error_observations(student_id,attempt_id,content_version_id,created_at) VALUES($1,$2,$3,'2026-10-05T01:01:00Z') RETURNING error_observation_id",[s,a,cv])).rows[0].error_observation_id;
+  await c.query("INSERT INTO error_cause_hypotheses(error_observation_id,cause_code,confidence,source) VALUES($1,'H1',.5,'Rule'),($1,'H2',.6,'Rule')",[o]);
+  const svc=new PilotExportService(c),a1=await svc.feedback(cohort,{limit:1}),a2=await svc.feedback(cohort,{limit:1,after:a1.next_cursor});
+  assert.equal(a1.rows.length,1);assert.equal(a2.rows.length,1);assert.equal(a1.rows[0].error_observation_id,a2.rows[0].error_observation_id);assert.notEqual(a1.rows[0].error_cause_hypothesis_id,a2.rows[0].error_cause_hypothesis_id);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
+
+it("attempt export excludes facts created before Pilot enrollment",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('window-private','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'window') RETURNING cohort_id",["WIN-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id,enrolled_at) VALUES($1,$2,'2026-10-05T00:00:00Z')",[cohort,s]);
+  const item=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
+  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[item])).rows[0].content_version_id;
+  await c.query("INSERT INTO question_attempts(student_id,content_version_id,request_id,answer_payload,result,occurred_at) VALUES($1,$2,$3,'{}','Correct','2026-10-04T23:59:00Z'),($1,$2,$4,'{}','Correct','2026-10-05T00:01:00Z')",[s,cv,crypto.randomUUID(),crypto.randomUUID()]);
+  const z=await new PilotExportService(c).attempts(cohort);assert.equal(z.rows.length,1);assert.equal(new Date(z.rows[0].occurred_at).toISOString(),"2026-10-05T00:01:00.000Z");
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
