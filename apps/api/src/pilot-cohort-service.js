@@ -4,9 +4,9 @@ export class PilotCohortService{
   const r=await this.pool.query("INSERT INTO pilot_cohorts(cohort_code,name,starts_on,ends_on,created_by) VALUES($1,$2,$3,$4,$5) RETURNING cohort_id,cohort_code,name,status,starts_on,ends_on,created_at",[cohort_code,name,starts_on,ends_on,actor||null]);return r.rows[0];
  }
  async enroll(cohortId,studentId,actor){
-  const r=await this.pool.query(`INSERT INTO pilot_cohort_memberships(cohort_id,student_id,created_by)
-   VALUES($1,$2,$3) ON CONFLICT(cohort_id,student_id) DO UPDATE SET status='Enrolled',ended_at=NULL
-   RETURNING membership_id,cohort_id,student_id,status,enrolled_at,ended_at`,[cohortId,studentId,actor||null]);return r.rows[0];
+  try{const r=await this.pool.query(`INSERT INTO pilot_cohort_memberships(cohort_id,student_id,created_by)
+   VALUES($1,$2,$3) RETURNING membership_id,cohort_id,student_id,status,enrolled_at,ended_at`,[cohortId,studentId,actor||null]);return r.rows[0];}
+  catch(e){if(e.code==="23505")throw Object.assign(new Error("membership already exists; Pilot membership history is not reactivated in place"),{status:409,code:"PILOT_MEMBERSHIP_EXISTS"});throw e;}
  }
  async listMembers(cohortId,{limit=100,offset=0}={}){
   const n=Math.min(Math.max(Number(limit)||100,1),500),o=Math.max(Number(offset)||0,0);
