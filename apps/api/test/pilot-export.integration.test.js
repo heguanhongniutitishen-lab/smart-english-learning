@@ -10,8 +10,8 @@ it("exports Pilot attempts with version provenance and no direct identity fields
   const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('private-name','Primary',5) RETURNING student_id")).rows[0].student_id;
   const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'export') RETURNING cohort_id",["EXP-"+crypto.randomUUID()])).rows[0].cohort_id;
   await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
-  const content=(await c.query("INSERT INTO contents(content_type,status) VALUES('Question','Active') RETURNING content_id")).rows[0].content_id;
-  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,status) VALUES($1,1,'{}','Published') RETURNING content_version_id",[content])).rows[0].content_version_id;
+  const content=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
+  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[content])).rows[0].content_version_id;
   const plan=(await c.query("INSERT INTO daily_plans(student_id,plan_date,version,status,available_minutes,strategy_version) VALUES($1,current_date,1,'Active',20,'scheduler-v1') RETURNING daily_plan_id",[s])).rows[0].daily_plan_id;
   const task=(await c.query("INSERT INTO daily_tasks(daily_plan_id,source_type,target_type,estimated_seconds,priority,sort_order,reason_code) VALUES($1,'SchoolSync','Knowledge',60,1,1,'Pilot') RETURNING daily_task_id",[plan])).rows[0].daily_task_id;
   await c.query("INSERT INTO question_attempts(student_id,daily_task_id,content_version_id,request_id,answer_payload,result,occurred_at) VALUES($1,$2,$3,$4,'{}','Correct',now())",[s,task,cv,crypto.randomUUID()]);
@@ -49,7 +49,9 @@ it("state export cursor does not duplicate rows",async()=>{
   const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('cursor-private','Primary',5) RETURNING student_id")).rows[0].student_id;
   const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'cursor') RETURNING cohort_id",["CUR-"+crypto.randomUUID()])).rows[0].cohort_id;
   await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
-  await c.query("INSERT INTO mastery_records(student_id,knowledge_id,mastery_state,confidence,evidence_count,model_version) VALUES($1,gen_random_uuid(),'S1',.5,0,'v1'),($1,gen_random_uuid(),'S2',.6,0,'v1')",[s]);
+  const k1=(await c.query("INSERT INTO knowledge_points(level,domain,code,name) VALUES(1,'Vocabulary',$1,'cursor-1') RETURNING knowledge_id",["CUR-K1-"+crypto.randomUUID()])).rows[0].knowledge_id;
+  const k2=(await c.query("INSERT INTO knowledge_points(level,domain,code,name) VALUES(1,'Vocabulary',$1,'cursor-2') RETURNING knowledge_id",["CUR-K2-"+crypto.randomUUID()])).rows[0].knowledge_id;
+  await c.query("INSERT INTO mastery_records(student_id,knowledge_id,mastery_state,confidence,evidence_count,model_version) VALUES($1,$2,'S1',.5,0,'v1'),($1,$3,'S2',.6,0,'v1')",[s,k1,k2]);
   const svc=new PilotExportService(c),a=await svc.state(cohort,{limit:1}),b=await svc.state(cohort,{limit:1,after:a.next_cursor});
   assert.equal(a.rows.length,1);assert.equal(b.rows.length,1);assert.notEqual(a.rows[0].target_id,b.rows[0].target_id);
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
