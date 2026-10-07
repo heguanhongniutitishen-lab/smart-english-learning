@@ -17,6 +17,7 @@ it("reports a clean Pilot cohort when durable provenance is complete",async()=>{
   const a=(await c.query("INSERT INTO question_attempts(student_id,daily_task_id,content_version_id,request_id,answer_payload,result,occurred_at) VALUES($1,$2,$3,$4,'{}','Correct',now()) RETURNING attempt_id",[s,task,cv,crypto.randomUUID()])).rows[0].attempt_id;
   const e=(await c.query("INSERT INTO evidences(student_id,attempt_id,target_type,target_id,direction,quality_score,independence_score,source,model_version) VALUES($1,$2,'Knowledge',gen_random_uuid(),'Positive',1,1,'Rule','evidence-v1') RETURNING evidence_id",[s,a])).rows[0].evidence_id;
   await c.query("INSERT INTO evidence_validity(evidence_id,status) VALUES($1,'Valid')",[e]);
+  await c.query("INSERT INTO mastery_records(student_id,knowledge_id,mastery_state,confidence,evidence_count,model_version) SELECT student_id,target_id,'S1',1,1,'state-v1' FROM evidences WHERE evidence_id=$1",[e]);
   const z=await new PilotReadinessReadModel(c).get(cohort);assert.equal(z.ready,true);assert.equal(z.blockers,0);assert.equal(Number(z.details.attempts.total),1);assert.equal(Number(z.details.evidence.total),1);
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
 });
@@ -29,5 +30,18 @@ it("makes missing evidence validity visible as a Pilot blocker",async()=>{
   await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
   await c.query("INSERT INTO evidences(student_id,target_type,target_id,direction,quality_score,independence_score,source,model_version) VALUES($1,'Knowledge',gen_random_uuid(),'Positive',1,1,'Rule','v1')",[s]);
   const z=await new PilotReadinessReadModel(c).get(cohort);assert.equal(z.ready,false);assert.ok(Number(z.details.evidence.missing_validity)>=1);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
+
+
+it("blocks Pilot readiness when valid evidence has no state projection",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('pilot-state-gap','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'state-gap') RETURNING cohort_id",["STATE-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  const e=(await c.query("INSERT INTO evidences(student_id,target_type,target_id,direction,quality_score,independence_score,source,model_version) VALUES($1,'Knowledge',gen_random_uuid(),'Positive',1,1,'Rule','v1') RETURNING evidence_id",[s])).rows[0].evidence_id;
+  await c.query("INSERT INTO evidence_validity(evidence_id,status) VALUES($1,'Valid')",[e]);
+  const z=await new PilotReadinessReadModel(c).get(cohort);assert.equal(z.ready,false);assert.ok(Number(z.details.state.missing_mastery)>=1);
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
 });
