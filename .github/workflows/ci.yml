@@ -33,3 +33,5 @@ jobs:
       - run: npm test --workspace=@sel/api
       - run: node --check apps/api/src/app.js
       - run: node --check apps/api/src/server.js
+      - run: npm run check --workspace=@sel/student-web
+      - run: npm test --workspace=@sel/student-web
