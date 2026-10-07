@@ -29,3 +29,28 @@ it("labels state export explicitly as a current projection snapshot",async()=>{
   const z=await new PilotExportService(c).state(cohort);assert.equal(z.snapshot_semantics,"current_projection_not_historical_period_state");
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
 });
+
+
+it("exports Evidence without payloads and labels validity semantics",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('e-private','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'evidence') RETURNING cohort_id",["EV-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  const e=(await c.query("INSERT INTO evidences(student_id,target_type,target_id,direction,quality_score,independence_score,source,model_version) VALUES($1,'Knowledge',gen_random_uuid(),'Positive',1,1,'Rule','v1') RETURNING evidence_id",[s])).rows[0].evidence_id;
+  await c.query("INSERT INTO evidence_validity(evidence_id,status) VALUES($1,'Valid')",[e]);
+  const z=await new PilotExportService(c).evidence(cohort);assert.equal(z.rows.length,1);assert.equal(z.rows[0].validity_status,"Valid");assert.equal(z.snapshot_semantics,"durable_evidence_with_current_validity");
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
+
+it("state export cursor does not duplicate rows",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('cursor-private','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'cursor') RETURNING cohort_id",["CUR-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
+  await c.query("INSERT INTO mastery_records(student_id,knowledge_id,mastery_state,confidence,evidence_count,model_version) VALUES($1,gen_random_uuid(),'S1',.5,0,'v1'),($1,gen_random_uuid(),'S2',.6,0,'v1')",[s]);
+  const svc=new PilotExportService(c),a=await svc.state(cohort,{limit:1}),b=await svc.state(cohort,{limit:1,after:a.next_cursor});
+  assert.equal(a.rows.length,1);assert.equal(b.rows.length,1);assert.notEqual(a.rows[0].target_id,b.rows[0].target_id);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
