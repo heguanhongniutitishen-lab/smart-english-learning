@@ -43,3 +43,25 @@ test("recovery readiness route rejects actor without student-state permission",a
  const req={method:"GET",headers:{"x-user-id":"u1"}},res=response();
  await assert.rejects(()=>h(req,res,new URL("http://x/api/v1/research/ops/recovery-readiness"),"rec-2"),x=>x.code==="AUTH_STUDENT_STATE_FORBIDDEN");
 });
+
+
+function jsonReq(method,path,body,role="ResearchAdmin"){return {req:{method,headers:{"x-user-id":"u1"},[Symbol.asyncIterator]:async function*(){if(body!==undefined)yield Buffer.from(JSON.stringify(body));}},url:new URL("http://x"+path),repo:{listUserRoles:async()=>[role]}};}
+
+test("Pilot cohort API is restricted to Pilot admins and supports lifecycle",async()=>{
+ const calls=[];const pilotCohorts={
+  create:async(b,a)=>(calls.push(["create",b,a]),{cohort_id:"c1",...b}),
+  enroll:async(c,s,a)=>(calls.push(["enroll",c,s,a]),{cohort_id:c,student_id:s,status:"Enrolled"}),
+  listMembers:async(c,q)=>(calls.push(["list",c,q]),[{student_id:"s1",status:"Enrolled"}]),
+  endMembership:async(c,s,status)=>(calls.push(["end",c,s,status]),{cohort_id:c,student_id:s,status})
+ };
+ let x=jsonReq("POST","/api/v1/research/pilot/cohorts",{cohort_code:"P0",name:"Pilot 0"});let h=createResearchHandler(x.repo,{pilotCohorts}),res=response();await h(x.req,res,x.url,"p1");assert.equal(res.statusCode,201);
+ x=jsonReq("POST","/api/v1/research/pilot/cohorts/c1/members",{student_id:"s1"});h=createResearchHandler(x.repo,{pilotCohorts});res=response();await h(x.req,res,x.url,"p2");assert.equal(res.statusCode,201);
+ x=jsonReq("GET","/api/v1/research/pilot/cohorts/c1/members?limit=20&offset=0");h=createResearchHandler(x.repo,{pilotCohorts});res=response();await h(x.req,res,x.url,"p3");assert.equal(JSON.parse(res.body).data[0].student_id,"s1");
+ x=jsonReq("POST","/api/v1/research/pilot/cohorts/c1/members/s1/end",{status:"Completed"});h=createResearchHandler(x.repo,{pilotCohorts});res=response();await h(x.req,res,x.url,"p4");assert.equal(JSON.parse(res.body).data.status,"Completed");
+ assert.equal(calls.length,4);
+});
+
+test("Pilot cohort API rejects ResearchEditor",async()=>{
+ const x=jsonReq("GET","/api/v1/research/pilot/cohorts/c1/members",undefined,"ResearchEditor"),h=createResearchHandler(x.repo,{pilotCohorts:{listMembers:async()=>[]}});
+ await assert.rejects(()=>h(x.req,response(),x.url,"p5"),e=>e.code==="AUTH_PILOT_ADMIN_FORBIDDEN");
+});
