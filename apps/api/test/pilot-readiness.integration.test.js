@@ -46,3 +46,15 @@ it("blocks Pilot readiness when valid evidence has no state projection",async()=
   const z=await new PilotReadinessReadModel(c).get(cohort);assert.equal(z.ready,false);assert.ok(Number(z.details.state.missing_mastery)>=1);
  }finally{await c.query("ROLLBACK");c.release();await p.end();}
 });
+
+
+it("readiness ignores pre-enrollment Pilot facts",async()=>{
+ const p=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL}),c=await p.connect();
+ try{await c.query("BEGIN");
+  const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('ready-window','Primary',5) RETURNING student_id")).rows[0].student_id;
+  const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'ready-window') RETURNING cohort_id",["RW-"+crypto.randomUUID()])).rows[0].cohort_id;
+  await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id,enrolled_at) VALUES($1,$2,'2026-10-05T00:00:00Z')",[cohort,s]);
+  await c.query("INSERT INTO evidences(student_id,target_type,target_id,direction,quality_score,independence_score,source,model_version,created_at) VALUES($1,'Knowledge',gen_random_uuid(),'Positive',1,1,'Rule','v1','2026-10-04T23:00:00Z')",[s]);
+  const z=await new PilotReadinessReadModel(c).get(cohort);assert.equal(Number(z.details.evidence.total),0);assert.equal(z.ready,true);
+ }finally{await c.query("ROLLBACK");c.release();await p.end();}
+});
