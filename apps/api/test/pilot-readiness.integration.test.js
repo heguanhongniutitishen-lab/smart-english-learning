@@ -10,8 +10,8 @@ it("reports a clean Pilot cohort when durable provenance is complete",async()=>{
   const s=(await c.query("INSERT INTO students(display_name,current_stage,current_grade) VALUES('pilot-ready','Primary',5) RETURNING student_id")).rows[0].student_id;
   const cohort=(await c.query("INSERT INTO pilot_cohorts(cohort_code,name) VALUES($1,'ready') RETURNING cohort_id",["READY-"+crypto.randomUUID()])).rows[0].cohort_id;
   await c.query("INSERT INTO pilot_cohort_memberships(cohort_id,student_id) VALUES($1,$2)",[cohort,s]);
-  const content=(await c.query("INSERT INTO contents(content_type,status) VALUES('Question','Active') RETURNING content_id")).rows[0].content_id;
-  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,status) VALUES($1,1,'{}','Published') RETURNING content_version_id",[content])).rows[0].content_version_id;
+  const content=(await c.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Draft') RETURNING content_id")).rows[0].content_id;
+  const cv=(await c.query("INSERT INTO content_versions(content_id,version_no,payload,review_status) VALUES($1,1,'{}','Approved') RETURNING content_version_id",[content])).rows[0].content_version_id;
   const plan=(await c.query("INSERT INTO daily_plans(student_id,plan_date,version,status,available_minutes,strategy_version) VALUES($1,current_date,1,'Active',20,'scheduler-v1') RETURNING daily_plan_id",[s])).rows[0].daily_plan_id;
   const task=(await c.query("INSERT INTO daily_tasks(daily_plan_id,source_type,target_type,estimated_seconds,priority,sort_order,reason_code) VALUES($1,'SchoolSync','Knowledge',60,1,1,'Pilot') RETURNING daily_task_id",[plan])).rows[0].daily_task_id;
   const a=(await c.query("INSERT INTO question_attempts(student_id,daily_task_id,content_version_id,request_id,answer_payload,result,occurred_at) VALUES($1,$2,$3,$4,'{}','Correct',now()) RETURNING attempt_id",[s,task,cv,crypto.randomUUID()])).rows[0].attempt_id;
