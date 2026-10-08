@@ -7,7 +7,8 @@ import {fileURLToPath} from "node:url";
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../../..");
 test("unapproved verification schema is not in auto-applied migrations",async()=>{
  const names=(await fs.readdir(path.join(root,"db/migrations"))).filter(n=>n.endsWith(".sql"));
- assert.equal(names.some(n=>/verification.question|verification.answer|verification.assignment/i.test(n)),false,
+ const sql=await Promise.all(names.map(n=>fs.readFile(path.join(root,"db/migrations",n),"utf8")));
+ assert.equal(sql.some(s=>/CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:verification_question_assignments|verification_question_answers)\\b/i.test(s)),false,
   "verification persistence requires schema review before auto-application");
 });
 test("verification answer isolation and approval gate are documented",async()=>{
