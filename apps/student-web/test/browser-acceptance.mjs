@@ -72,7 +72,7 @@ async function run(){
  await page.getByRole("heading",{name:/Which word means/}).waitFor();
  await page.locator(".option").nth(0).click();
  await page.getByText("答对了").waitFor();
- await page.getByRole("button",{name:"继续"}).click();
+ await page.locator("#player #next").click();
  await page.getByRole("heading",{name:"这一小段完成了"}).waitFor();
  const summary=await page.locator(".lesson.success").innerText();
  assert.match(summary,/答题 2 道/);
@@ -83,9 +83,9 @@ async function run(){
  await page.locator("#start").click();
  await page.locator(".option").nth(1).click();
  await page.getByText("答对了").waitFor();
- await page.getByRole("button",{name:"继续"}).click();
+ await page.locator("#player #next").click();
  await page.locator(".option").nth(0).click();
- await page.getByRole("button",{name:"继续"}).click();
+ await page.locator("#player #next").click();
  const cleanSummary=await page.locator(".lesson.success").innerText();
  assert.match(cleanSummary,/答对 2 道/);
  assert.match(cleanSummary,/未进行错题修复/);
