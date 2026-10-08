@@ -6,7 +6,9 @@
     "start": "node server.js",
     "check": "node --check server.js && node --check public/app.js",
     "test": "node --test test/*.test.js test/*.test.mjs",
-    "verify:deployment": "node scripts/verify-deployment.js"
+    "verify:deployment": "node scripts/verify-deployment.js",
+    "check:release": "node scripts/check-release-readiness.mjs",
+    "test:release-gate": "node scripts/check-release-readiness.mjs --expect-blocked"
   },
   "engines": {
     "node": ">=20"
