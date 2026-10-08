@@ -38,6 +38,10 @@ try{
  const errors=[];page.on("pageerror",e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${webPort}/?student=${fixture.studentId}&user=${fixture.userId}&date=${date}`);
  await page.getByText("开发联调身份模式",{exact:false}).waitFor();
+ await page.getByRole("heading",{name:"今天学什么"}).waitFor();
+ await page.getByRole("heading",{name:"学习成长"}).waitFor();
+ assert.equal(await page.locator(".task").count(),2);
+ assert.equal(await page.locator("#progress-fill").getAttribute("style"),"width: 0%;");
  await page.getByText("待学习",{exact:true}).first().waitFor();
  await page.getByRole("button",{name:"开始今日学习"}).click();
  await page.getByRole("heading",{name:"My brother ___ football."}).waitFor();
