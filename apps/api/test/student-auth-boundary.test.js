@@ -5,7 +5,8 @@ const user="00000000-0000-4000-8000-000000000011";
 test("signed short-lived bearer binds identity and ignores forged x-user-id",()=>{
  const token=issueStudentToken(user,secret,{now:1000,ttl:900});
  assert.equal(verifyStudentBearer("Bearer "+token,secret,{now:1100}),user);
- const req={headers:{authorization:"Bearer "+token,"x-user-id":"attacker"}};
+ const current=issueStudentToken(user,secret);
+ const req={headers:{authorization:"Bearer "+current,"x-user-id":"attacker"}};
  enforceStudentAuth(req,"/api/v1/students/111/active-learning/today",{mode:"signed",secret});
  assert.equal(req.headers["x-user-id"],user);
 });
