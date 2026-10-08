@@ -29,3 +29,15 @@ To use the existing local API, supply both `student` and `user` identities, opti
 A green CI does **not** prove the Vercel production URL has deployed the newest commit, or that a real student account can complete a live end-to-end session. Validate both separately before declaring release-ready. Do not merge the draft Sprint 11 PR without approval.
 
 This student UI consumes existing contracts and does not redefine scoring, mastery, scheduler, evidence or error-cause verification rules.
+
+## Public Vercel deployment verification
+
+From a machine with access to the public Internet:
+
+```bash
+npm run verify:deployment --workspace=@sel/student-web -- https://smart-english-demo.vercel.app
+```
+
+This checks the public home page, CSS and JavaScript module URLs and tests for the latest recovery-flow code markers. A PASS confirms these public static assets can be read; it does not prove a specific Git commit was deployed or that production API/student authentication works. A FAIL may indicate access restrictions, connectivity, or stale deployment. CI itself does not perform this production check.
+
+To independently inspect the actual production commit, open Vercel → smart-english-demo → Deployments → current Production deployment and compare its branch/commit with the Sprint 11 GitHub HEAD.
