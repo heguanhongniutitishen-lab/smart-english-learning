@@ -34,6 +34,10 @@ jobs:
       - run: node --check apps/api/src/app.js
       - run: node --check apps/api/src/server.js
       - run: npm run check --workspace=@sel/student-web
+      - name: Check native miniapp scaffold
+        run: |
+          node --check apps/student-miniapp/pages/home/index.js
+          node --test apps/student-miniapp/test/scaffold.test.mjs
       - run: npm test --workspace=@sel/student-web
       - name: Ensure development identity contract remains release-blocked
         run: npm run test:release-gate --workspace=@sel/student-web
