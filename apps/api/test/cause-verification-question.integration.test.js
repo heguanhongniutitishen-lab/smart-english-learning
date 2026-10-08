@@ -40,6 +40,13 @@ it("returns only a different, published and human-approved question without answ
  assert.equal(graded.cause_updated,false);
  const replay=await grader.submit(student.student_id,h.error_cause_hypothesis_id,body,key);
  assert.equal(replay.attempt.attempt_id,graded.attempt.attempt_id);
+ const evidence=(await p.query("SELECT verification_type,content_version_id,attempt_id,result FROM error_cause_verifications WHERE error_cause_hypothesis_id=$1",[h.error_cause_hypothesis_id])).rows;
+ assert.equal(evidence.length,1);
+ assert.equal(evidence[0].attempt_id,graded.attempt.attempt_id);
+ assert.equal(evidence[0].content_version_id,independent.content_version_id);
+ assert.equal(evidence[0].verification_type,"Question");
+ assert.equal(evidence[0].result,null);
+
  await assert.rejects(()=>grader.submit(student.student_id,h.error_cause_hypothesis_id,{...body,answer_payload:{choice_index:1}},key),e=>e.code==="VERIFICATION_REPLAY_CONFLICT");
  assert.equal(Number((await p.query("SELECT count(*) n FROM question_attempts WHERE student_id=$1 AND request_id=$2",[student.student_id,key])).rows[0].n),1);
  assert.equal(Number((await p.query("SELECT count(*) n FROM outbox_events WHERE aggregate_id=$1 AND event_type='AttemptRecorded'",[graded.attempt.attempt_id])).rows[0].n),1);
