@@ -1,3 +1,4 @@
+import {exchangeWechatCode} from "./wechat-code-exchange.js";
 import {enforceStudentAuth} from "./student-auth-boundary.js";
 import {randomUUID} from "node:crypto";import {readJson,ok,fail} from "./http.js";import {MemoryStore} from "./store.js";import {IdempotencyStore} from "./idempotency.js";
 export function createHandler(store=new MemoryStore(),idem=new IdempotencyStore(),researchHandler=null,learningRepo=null,dailyPlanHandler=null,diagnosticHandler=null,feedbackHandler=null,activeLearningHandler=null,wrongBookHandler=null,growthHandler=null,studentTaskContentHandler=null,studentAnswerHandler=null,causeVerificationQuestionHandler=null,studentAuthOptions=null){return async(req,res)=>{const id=String(req.headers["x-request-id"]||randomUUID());try{const u=new URL(req.url,"http://localhost");if(studentAuthOptions)enforceStudentAuth(req,u.pathname,studentAuthOptions);
@@ -13,6 +14,12 @@ if(dailyPlanHandler&&u.pathname.includes("/daily-")){const handled=await dailyPl
 if(researchHandler&&u.pathname.startsWith("/api/v1/research/")){const handled=await researchHandler(req,res,u,id);if(handled!==false)return handled;}
 if(req.method==="GET"&&u.pathname==="/health")return ok(res,{status:"ok",service:"smart-english-api"},id);
 if(req.method==="GET"&&u.pathname==="/health/ready"){if(typeof store.health==="function")await store.health();return ok(res,{status:"ready"},id);}
+if(req.method==="POST"&&u.pathname==="/api/v1/auth/wechat/code-exchange"){
+ if(studentAuthOptions?.mode!=="signed")return fail(res,403,"AUTH_SIGNED_MODE_REQUIRED","trusted WeChat exchange requires signed authentication mode",id);
+ const body=await readJson(req);
+ const result=await exchangeWechatCode({code:body.code,store,secret:studentAuthOptions.secret,appId:studentAuthOptions.wechatAppId,appSecret:studentAuthOptions.wechatAppSecret,fetchImpl:studentAuthOptions.wechatFetch});
+ return ok(res,result,id);
+}
 if(req.method==="POST"&&u.pathname==="/api/v1/auth/wechat/login"){const b=await readJson(req);if(!b.open_id)return fail(res,400,"AUTH_OPEN_ID_REQUIRED","open_id is required",id);const z=await store.loginWechat(String(b.open_id));return ok(res,{user_id:z.user_id,status:z.status},id);}
 if(req.method==="GET"&&u.pathname==="/api/v1/curriculum/textbooks")return ok(res,await store.listTextbooks(Object.fromEntries(u.searchParams)),id);
 let m=u.pathname.match(/^\/api\/v1\/curriculum\/textbooks\/([^/]+)\/structure$/);if(req.method==="GET"&&m){const z=await store.getStructure(m[1]);return z?ok(res,z,id):fail(res,404,"CURRICULUM_TEXTBOOK_NOT_FOUND","textbook not found",id);}
