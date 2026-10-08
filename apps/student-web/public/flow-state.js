@@ -6,3 +6,5 @@ export function canSubmitAnswer(state){return state===Flow.ANSWERING}
 export function canCompleteTask(state){return state!==Flow.COMPLETING&&state!==Flow.LOADING_NEXT}
 
 export function canUseDemoQuestions(studentId,userId){return !studentId&&!userId}
+
+export function completionFailureCopy(saved){return saved?"本项已完成，但下一项暂时无法加载":"本项进度提交未确认"}
