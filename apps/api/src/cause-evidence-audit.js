@@ -10,6 +10,12 @@ export function inspectCauseEvidence(rows){
     r.content_version_id===r.original_content_version_id||r.content_item_id===r.original_content_item_id){
    reasons.push("INVALID_EVIDENCE_PROVENANCE");continue;
   }
+  if(r.observation_type!=="WrongAnswer"&&r.observation_type!=="RepeatedWrong"||
+    r.original_attempt_student_id!==r.observation_student_id||
+    r.original_attempt_content_version_id!==r.original_content_version_id||
+    r.original_attempt_result!=="Wrong"||r.original_attempt_technical_status!=="OK"){
+   reasons.push("ORIGINAL_WRONG_ATTEMPT_INVALID");continue;
+  }
   if(r.review_status!=="Approved"||r.item_status!=="Published"||!r.reviewed_by||!r.published_at||
     r.current_version_id!==r.content_version_id||r.target_mapped!==true){
    reasons.push("CONTENT_APPROVAL_OR_TARGET_INVALID");continue;
@@ -37,6 +43,10 @@ export class CauseEvidenceAuditReadModel{
   const result=await this.pool.query(`SELECT v.attempt_id,v.verification_type,v.result,v.content_version_id,
     a.content_version_id AS attempt_content_version_id,a.student_id,a.exposure_type,a.technical_status,a.result AS attempt_result,
     o.student_id AS observation_student_id,o.content_version_id AS original_content_version_id,
+    o.observation_type,source_attempt.student_id AS original_attempt_student_id,
+    source_attempt.content_version_id AS original_attempt_content_version_id,
+    source_attempt.result AS original_attempt_result,
+    source_attempt.technical_status AS original_attempt_technical_status,
     ci.content_id AS content_item_id,original.content_id AS original_content_item_id,
     ci.current_version_id,ci.status AS item_status,cv.review_status,cv.reviewed_by,cv.published_at,
     CASE WHEN h.rationale->>'target_type'='Knowledge' THEN EXISTS(
@@ -48,6 +58,7 @@ export class CauseEvidenceAuditReadModel{
     FROM error_cause_verifications v
     JOIN error_cause_hypotheses h ON h.error_cause_hypothesis_id=v.error_cause_hypothesis_id
     JOIN error_observations o USING(error_observation_id)
+    LEFT JOIN question_attempts source_attempt ON source_attempt.attempt_id=o.attempt_id
     LEFT JOIN question_attempts a ON a.attempt_id=v.attempt_id
     LEFT JOIN content_versions cv ON cv.content_version_id=v.content_version_id
     LEFT JOIN content_items ci ON ci.content_id=cv.content_id
