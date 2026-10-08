@@ -1,0 +1,6 @@
+const KEY="sel:pending-task-completion:v1";
+export function isTaskCompleted(today,taskId){return Array.isArray(today?.tasks)&&today.tasks.some(t=>t.task_id===taskId&&t.status==="Completed")}
+export function shouldRetryCompletion(today,taskId){if(!Array.isArray(today?.tasks))return false;const task=today.tasks.find(t=>t.task_id===taskId);return Boolean(task&&task.status==="Pending")}
+export function savePendingCompletion(storage,identity,taskId,now=Date.now()){if(!storage||!identity?.student||!identity?.user||!taskId)return false;try{storage.setItem(KEY,JSON.stringify({identity,taskId,createdAt:now}));return true}catch{return false}}
+export function readPendingCompletion(storage,identity,now=Date.now()){if(!storage||!identity?.student||!identity?.user)return null;try{const raw=storage.getItem(KEY);if(!raw)return null;const saved=JSON.parse(raw);if(saved.identity?.student!==identity.student||saved.identity?.user!==identity.user||typeof saved.taskId!=="string"||!saved.taskId||!Number.isFinite(saved.createdAt)||saved.createdAt>now||now-saved.createdAt>30*60*1000){storage.removeItem(KEY);return null}return saved.taskId}catch{try{storage.removeItem(KEY)}catch{}return null}}
+export function clearPendingCompletion(storage){try{storage?.removeItem(KEY)}catch{}}
