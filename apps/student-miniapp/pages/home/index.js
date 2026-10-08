@@ -9,7 +9,7 @@ Page({
   try{
    const auth=await getApp().loginWithWechat();
    const base=getApp().globalData.apiBase;
-   const result=await new Promise((resolve,reject)=>wx.request({url:base.replace(/\\/$/,"")+"/api/v1/students/me/bindings",header:{Authorization:"Bearer "+auth.token},success:r=>r.statusCode>=200&&r.statusCode<300?resolve(r.data?.data??r.data):reject(Error("无法验证学生绑定关系")),fail:()=>reject(Error("学生绑定查询失败"))}));
+   const result=await new Promise((resolve,reject)=>wx.request({url:(base.endsWith("/")?base.slice(0,-1):base)+"/api/v1/students/me/bindings",header:{Authorization:"Bearer "+auth.token},success:r=>r.statusCode>=200&&r.statusCode<300?resolve(r.data?.data??r.data):reject(Error("无法验证学生绑定关系")),fail:()=>reject(Error("学生绑定查询失败"))}));
    const students=result?.students;
    if(!Array.isArray(students))throw Error("绑定查询响应无效");
    if(students.length!==1){
