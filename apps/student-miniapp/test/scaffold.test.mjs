@@ -41,3 +41,16 @@ test("native WeChat authentication uses server code exchange and never client op
  assert.match(home,/Date\.now\(\)>=auth\.expiresAt/);
  assert.match(home,/canStart:false/);
 });
+
+test("student switch requires server roster and discards stale learner state",()=>{
+ const home=read("pages/home/index.js");
+ const markup=read("pages/home/index.wxml");
+ assert.match(markup,/bindtap="chooseStudent"/);
+ assert.match(markup,/bindtap="switchStudent"/);
+ assert.match(home,/\/api\/v1\/students\/me\/bindings/);
+ assert.match(home,/this\.data\.boundStudents\.find/);
+ assert.match(home,/this\.data\.boundStudents\.some/);
+ assert.match(home,/tasks:\[\],completedText:"--"/);
+ assert.match(home,/getApp\(\)\.globalData\.auth\?\.studentId!==auth\.studentId/);
+ assert.match(home,/getApp\(\)\.globalData\.auth\?\.studentId!==decodeURIComponent\(id\)/);
+});
