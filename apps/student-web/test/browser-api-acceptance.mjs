@@ -78,6 +78,9 @@ try{
  await wrongPage.getByRole("heading",{name:"Tom ___ every day."}).waitFor();
  await wrongPage.locator("[data-v-index]").nth(0).click();
  await wrongPage.getByText("这次作答已记录").waitFor();
+ await wrongPage.getByText("错因待审查").waitFor();
+ await wrongPage.getByText("已核验 1 条独立作答证据").waitFor();
+ await wrongPage.getByText("尚不足以确认具体错因或判定掌握").waitFor();
  const graded=(await pool.query("SELECT result,exposure_type,content_version_id FROM question_attempts WHERE student_id=$1 AND exposure_type='Verification'",[wrongFixture.studentId])).rows;
  assert.equal(graded.length,1);assert.equal(graded[0].result,"Wrong");assert.equal(graded[0].content_version_id,independent.content_version_id);
  const linkedEvidence=(await pool.query("SELECT v.result,v.content_version_id,v.attempt_id FROM error_cause_verifications v JOIN question_attempts a ON a.attempt_id=v.attempt_id WHERE a.student_id=$1 AND a.exposure_type='Verification'",[wrongFixture.studentId])).rows;
