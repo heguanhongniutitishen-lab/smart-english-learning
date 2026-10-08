@@ -36,7 +36,7 @@ Page({
   const id=event.currentTarget.dataset.studentId;
   const selected=this.data.boundStudents.find(s=>s.student_id===id);
   if(!selected)return;
-  await this.selectBoundStudent(selected);
+  try{await this.selectBoundStudent(selected);}catch(e){this.setData({error:e.message});}
  },
  async selectBoundStudent(selected){
   const app=getApp(),auth=app.globalData.auth;
@@ -48,11 +48,12 @@ Page({
  },
  request(path){const {apiBase,auth}=getApp().globalData;if(!apiBase||!auth?.token||!auth?.studentId||Date.now()>=auth.expiresAt)return Promise.reject(Error("尚未接入正式登录会话"));return new Promise((resolve,reject)=>wx.request({url:apiBase+path,header:{Authorization:"Bearer "+auth.token},success:r=>r.statusCode>=200&&r.statusCode<300?resolve(r.data?.data??r.data):reject(Error("服务器未返回可用记录")),fail:()=>reject(Error("网络不可用"))}));},
  async load(){const {apiBase,auth}=getApp().globalData;if(!apiBase||!auth?.token||!auth?.studentId||Date.now()>=auth.expiresAt){this.setData({authorized:false,error:"",canStart:false});return;}this.setData({authorized:true,error:"",canStart:false});const now=new Date(),date=[now.getFullYear(),String(now.getMonth()+1).padStart(2,"0"),String(now.getDate()).padStart(2,"0")].join("-"),id=encodeURIComponent(auth.studentId);
- try{const plan=await this.request("/api/v1/students/"+id+"/active-learning/today?date="+date),s=plan.summary||{},tasks=Array.isArray(plan.tasks)?plan.tasks:[],stage=["Primary","Middle","High"].includes(auth.stage)?auth.stage:"Unspecified",theme=themes[stage],ratio=safeNumber(s.progress_ratio),p=ratio!==null&&ratio<=1?Math.round(ratio*100):null,completed=safeNumber(s.completed_tasks),pending=safeNumber(s.pending_tasks),minutes=safeNumber(s.estimated_total_minutes);
+ try{const plan=await this.request("/api/v1/students/"+id+"/active-learning/today?date="+date);if(getApp().globalData.auth?.studentId!==auth.studentId)return;const s=plan.summary||{},tasks=Array.isArray(plan.tasks)?plan.tasks:[],stage=["Primary","Middle","High"].includes(auth.stage)?auth.stage:"Unspecified",theme=themes[stage],ratio=safeNumber(s.progress_ratio),p=ratio!==null&&ratio<=1?Math.round(ratio*100):null,completed=safeNumber(s.completed_tasks),pending=safeNumber(s.pending_tasks),minutes=safeNumber(s.estimated_total_minutes);
  this.setData({stage,greeting:theme[0],subtitle:theme[1],primary:theme[2],heroTitle:plan.current_task?"今天的学习已准备好":tasks.length?"今天的任务完成啦":"今天还没有安排任务",heroDescription:"今日计划数据来自服务器",progressText:p===null?"--":p+"%",progressPercent:p??0,completedText:completed??"--",pendingText:pending??"--",minutesText:minutes??"--",goalText:tasks.length?"今日计划 "+tasks.length+" 项任务，已完成 "+(completed??"--")+" 项。":"今天暂无已安排的学习任务。",tasks:tasks.map((t,i)=>({task_id:t.task_id||"display-"+i,name:names[t.source_type]||"学习任务",state:t.status==="Completed"?"已完成":t.status==="InProgress"?"进行中":"待学习"}))});this.loadGrowth(id);
- }catch(e){this.setData({error:e.message,canStart:false,growthText:"成长记录暂不可用。",focusText:"缺少可信数据，不能推断薄弱点。"});}},
+ }catch(e){if(getApp().globalData.auth?.studentId!==auth.studentId)return;this.setData({error:e.message,canStart:false,growthText:"成长记录暂不可用。",focusText:"缺少可信数据，不能推断薄弱点。"});}},
  async loadGrowth(id){try{const v=await this.request("/api/v1/students/"+id+"/growth"),completed=safeNumber(v.tasks?.completed),seconds=safeNumber(v.learning?.effective_seconds),sessions=safeNumber(v.learning?.session_count),due=safeNumber(v.review?.due_count);if([completed,seconds,sessions,due].includes(null))throw Error("无效记录");
+ if(getApp().globalData.auth?.studentId!==decodeURIComponent(id))return;
  this.setData({growthText:"最近记录：完成 "+completed+" 项任务，有效学习 "+Math.floor(seconds/60)+" 分钟（"+sessions+" 次已结束会话）。不代表成绩提升。",focusText:due>0?"有 "+due+" 项到期复习。这不是已确认的错因。":"暂无审核证据确认的薄弱点结论。"});
- }catch{this.setData({growthText:"成长记录暂不可用。",focusText:"缺少可信数据，不能推断薄弱点。"});}},
+ }catch{if(getApp().globalData.auth?.studentId!==decodeURIComponent(id))return;this.setData({growthText:"成长记录暂不可用。",focusText:"缺少可信数据，不能推断薄弱点。"});}},
  startLearning(){wx.showToast({title:"尚未接入安全答题及进度恢复",icon:"none"});}
 });
