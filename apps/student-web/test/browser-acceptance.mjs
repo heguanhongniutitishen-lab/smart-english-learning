@@ -19,7 +19,10 @@ async function run(){
  const pageErrors=[];
  page.on("pageerror",error=>pageErrors.push(error.message));
  await page.goto(`http://127.0.0.1:${port}/`);
- await page.getByRole("button",{name:"开始今日学习"}).click();
+ await page.locator("#start").waitFor();
+ assert.match(await page.locator("#start").innerText(),/开始今日学习|继续今日学习/);
+ await page.getByRole("heading",{name:"学习目标"}).waitFor();
+ await page.locator("#start").click();
  await page.getByRole("heading",{name:/My brother/}).waitFor();
  await page.locator(".option").nth(0).click();
  await page.getByText("这里卡了一下").waitFor();
@@ -40,7 +43,7 @@ async function run(){
  assert.match(summary,/答错 1 道/);
  assert.match(summary,/1 次演示修复练习/);
  await page.getByRole("button",{name:"回到今日学习"}).click();
- await page.getByRole("button",{name:"开始今日学习"}).click();
+ await page.locator("#start").click();
  await page.locator(".option").nth(1).click();
  await page.getByText("答对了").waitFor();
  await page.getByRole("button",{name:"继续"}).click();
