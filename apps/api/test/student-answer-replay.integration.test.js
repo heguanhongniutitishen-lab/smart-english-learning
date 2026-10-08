@@ -15,8 +15,16 @@ it("replays the same persisted answer after its task is no longer Pending, rejec
  await pool.query("UPDATE content_items SET current_version_id=$2 WHERE content_id=$1",[item.content_id,v.content_version_id]);
  await pool.query("INSERT INTO content_knowledge(content_version_id,knowledge_id,role,weight,purpose,review_status) VALUES($1,$2,'PrimaryTested',1,'Learn','Approved')",[v.content_version_id,k.knowledge_id]);
  const svc=new StudentAnswerService(pool,new LearningPostgresRepository(pool)),input={daily_task_id:task.daily_task_id,content_version_id:v.content_version_id,answer_payload:{choice_index:1}};
- const requestId="answer-replay-"+crypto.randomUUID(),first=await svc.submit(student.student_id,input,requestId);
+ const requestId="answer-replay-"+crypto.randomUUID();
+ const concurrent=await Promise.all([svc.submit(student.student_id,input,requestId),svc.submit(student.student_id,input,requestId)]);
+ const first=concurrent[0];assert.equal(concurrent[1].attempt_id,first.attempt_id);
  assert.equal(first.result,"Correct");
+ const conflictingKey="answer-conflict-"+crypto.randomUUID();
+ const conflicting=await Promise.allSettled([svc.submit(student.student_id,input,conflictingKey),svc.submit(student.student_id,{...input,answer_payload:{choice_index:0}},conflictingKey)]);
+ assert.equal(conflicting.filter(x=>x.status==="fulfilled").length,1);
+ assert.equal(conflicting.filter(x=>x.status==="rejected"&&x.reason?.code==="STUDENT_ANSWER_IDEMPOTENCY_CONFLICT").length,1);
+ const conflictingAttempts=await pool.query("SELECT count(*)::int AS n FROM question_attempts WHERE student_id=$1 AND request_id=$2",[student.student_id,conflictingKey]);
+ assert.equal(conflictingAttempts.rows[0].n,1);
  await pool.query("UPDATE daily_tasks SET status='Completed' WHERE daily_task_id=$1",[task.daily_task_id]);
  const replay=await svc.submit(student.student_id,{...input,answer_payload:{choice_index:1}},requestId);
  assert.equal(replay.attempt_id,first.attempt_id);assert.equal(replay.explanation_payload.text,"goes is correct");
