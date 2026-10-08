@@ -73,3 +73,7 @@ The independently graded verification attempt is now linked to its originating c
 ## Evidence replay safety
 
 A persisted independent verification attempt may belong to only one candidate cause. Replaying its original idempotent request returns that original evidence link even after the cause status changes, without adding a second evidence or repair record. Attempting to attach the same answer to a different cause is a conflict. These are evidence-integrity protections, **not** cause adjudication criteria.
+
+## Read-only cause evidence audit (Sprint 11)
+
+`CauseEvidenceAuditReadModel` and `inspectCauseEvidence` inspect provenance, ownership, original-versus-independent content identity, approved publication, target mapping, duplicate attempt references, technical status, and whether evidence has already been adjudicated. They return `PendingReview`, eligibility counts, and diagnostic reason codes. They **never** translate one correct or wrong answer into a `Supports` or `Contradicts` verdict, alter cause status/mastery, or create repair tasks. No reviewed cause-adjudication policy exists yet. The audit is internal only and is not exposed as a student-facing proof or recommendation.
