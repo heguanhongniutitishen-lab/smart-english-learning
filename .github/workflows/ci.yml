@@ -35,3 +35,19 @@ jobs:
       - run: node --check apps/api/src/server.js
       - run: npm run check --workspace=@sel/student-web
       - run: npm test --workspace=@sel/student-web
+
+  student-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Install test-only Chromium and browser driver
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Exercise student demo in Chromium
+        run: node apps/student-web/test/browser-acceptance.mjs
