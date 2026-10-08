@@ -53,3 +53,7 @@ Sprint 11 PR CI additionally runs `apps/student-web/test/browser-acceptance.mjs`
 ## Authenticated API browser acceptance
 
 The Sprint 11 CI browser job now starts PostgreSQL 16 and the real API, inserts isolated synthetic users, student binding, an active plan and two human-approved published question versions, and drives Chromium through both tasks. It asserts precisely two persisted Correct attempts, two completed daily tasks, and two AttemptRecorded outbox records. No real student records or external API are used. The fixture does not prove production login, deployment, or adaptive mistake repair; those remain separate release gates.
+
+## Wrong-answer real API browser acceptance
+
+The authenticated Chromium test now also uses a second isolated synthetic student to submit a wrong answer, asserts a persisted `WrongAnswer` observation and a `Candidate` error-cause hypothesis, confirms **zero** `micro_repair_tasks` without verified evidence, and returns to the next mainline task. This verifies observation and non-fabrication of repairs, **not** the full independent error-cause verification and personalized repair loop. That remains an explicit Sprint 11 gap.
