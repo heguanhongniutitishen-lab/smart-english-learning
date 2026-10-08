@@ -96,6 +96,7 @@ try{
  assert.equal(statusBody.wrong_count,1);
  assert.ok(statusBody.reasons.includes("CAUSE_ADJUDICATION_POLICY_NOT_APPROVED"));
 
+
  let feedbackRows=[];
  for(let i=0;i<40;i++){
   feedbackRows=(await pool.query("SELECT o.observation_type,h.status AS cause_status FROM error_observations o JOIN error_cause_hypotheses h USING(error_observation_id) WHERE o.student_id=$1",[wrongFixture.studentId])).rows;
@@ -114,6 +115,10 @@ try{
  await wrongPage.getByRole("heading",{name:"这一小段完成了"}).waitFor();
  const wrongAttempts=(await pool.query("SELECT result FROM question_attempts WHERE student_id=$1 AND daily_task_id IS NOT NULL ORDER BY occurred_at",[wrongFixture.studentId])).rows;
  assert.deepEqual(wrongAttempts.map(x=>x.result),["Wrong","Correct"]);
+ await wrongPage.reload();
+ await wrongPage.getByText("上次确认练习已保存 · 错因待审查").waitFor();
+ await wrongPage.getByText("无需重复作答，继续今日学习即可。").waitFor();
+ assert.equal(Number((await pool.query("SELECT count(*) n FROM question_attempts WHERE student_id=$1 AND exposure_type='Verification'",[wrongFixture.studentId])).rows[0].n),1);
  assert.equal(Number((await pool.query("SELECT count(*) AS n FROM daily_tasks t JOIN daily_plans p USING(daily_plan_id) WHERE p.student_id=$1 AND t.status='Completed'",[wrongFixture.studentId])).rows[0].n),2);
  assert.deepEqual(wrongErrors,[]);
  console.log("PASS real wrong answer: independent graded question saved; cause stays Candidate; no unverified repair; return to mainline");
