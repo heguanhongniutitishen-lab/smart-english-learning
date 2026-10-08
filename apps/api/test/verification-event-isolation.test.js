@@ -29,3 +29,19 @@ test("ordinary AttemptRecorded still enters existing evidence and feedback route
  assert.equal(result.status,"Processed");
  assert.deepEqual(calls,["evidence","mastery","feedback"]);
 });
+
+test("unsupported outbox event is retried rather than silently acknowledged",async()=>{
+ const calls=[];
+ const event={event_id:"event-unknown",event_type:"UnexpectedFutureEvent",aggregate_id:"future-1",claim_token:"claim-unknown",attempt_count:1};
+ const pool={query:async(sql)=>{
+  if(sql.includes("WITH candidate AS"))return{rows:[event]};
+  if(sql.includes("SET last_error=")){calls.push("retry");return{rows:[],rowCount:1};}
+  if(sql.includes("SET processed_at=now()"))throw new Error("unsupported event must not be acknowledged");
+  throw new Error("unexpected query: "+sql);
+ }};
+ const worker=new OutboxWorker(pool,{buildForAttempt:async()=>{throw new Error("should not build evidence");}});
+ const result=await worker.processOne();
+ assert.equal(result.status,"Retry");
+ assert.match(result.error,/UNSUPPORTED_OUTBOX_EVENT_TYPE/);
+ assert.deepEqual(calls,["retry"]);
+});
