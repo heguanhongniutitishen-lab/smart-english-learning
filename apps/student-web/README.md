@@ -89,3 +89,7 @@ Read-only cause evidence audit now checks the initiating error observation again
 ## Student-facing pending evidence status
 
 After a successful independent confirmation answer, the real student UI reads the student-scoped evidence status endpoint and displays the server-confirmed count of eligible answers, correct/wrong counts, and an explicit `错因待审查` message. It never says the cause is verified or mastery has been achieved. If this secondary status query fails, the answer remains recorded and the learner can return to the mainline. Chromium acceptance asserts the actual on-screen pending status. No repair is automatically planned.
+
+## Interrupted independent confirmation recovery
+
+Before POSTing an independently approved confirmation answer, the browser stores the original cause ID, server content version, answer payload and idempotency key in session storage, scoped by bound student, user and plan date. On reload, the student is offered a deliberate **same-request replay**; it does not choose a fresh answer or generate a new request ID. The pending record clears only after the server confirms the original request. Storage is discarded if identity/date differs or it exceeds 30 minutes. If the network response is lost after server persistence, replay should return the original immutable attempt and exactly one linked cause evidence. This does not adjudicate the cause or complete a micro-repair.
