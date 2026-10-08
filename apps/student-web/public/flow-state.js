@@ -4,3 +4,5 @@ export function canTransition(from,to){return from===to||allowed.get(from)?.has(
 export function transition(from,to){if(!canTransition(from,to))throw Object.assign(new Error(`invalid student flow transition: ${from} -> ${to}`),{code:"INVALID_STUDENT_FLOW_TRANSITION"});return to}
 export function canSubmitAnswer(state){return state===Flow.ANSWERING}
 export function canCompleteTask(state){return state!==Flow.COMPLETING&&state!==Flow.LOADING_NEXT}
+
+export function canUseDemoQuestions(studentId,userId){return !studentId&&!userId}
