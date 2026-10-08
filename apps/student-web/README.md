@@ -57,3 +57,7 @@ The Sprint 11 CI browser job now starts PostgreSQL 16 and the real API, inserts 
 ## Wrong-answer real API browser acceptance
 
 The authenticated Chromium test now also uses a second isolated synthetic student to submit a wrong answer, asserts a persisted `WrongAnswer` observation and a `Candidate` error-cause hypothesis, confirms **zero** `micro_repair_tasks` without verified evidence, and returns to the next mainline task. This verifies observation and non-fabrication of repairs, **not** the full independent error-cause verification and personalized repair loop. That remains an explicit Sprint 11 gap.
+
+## Independent cause-verification question lookup (partial)
+
+The real API now exposes `GET /api/v1/students/:studentId/feedback/causes/:hypothesisId/question` to an authorized bound student. It selects a **different** current published, human-approved content version mapped to the candidate cause target, without returning its answer or explanation payload. If none is eligible, it returns an unavailable response. This endpoint **only selects a question**: it does not accept a verification answer, score verification evidence, update candidate status, or create repair tasks. Those remain future, separately reviewed work, and arbitrary client-reported `Supports` must not be treated as independently demonstrated evidence.
