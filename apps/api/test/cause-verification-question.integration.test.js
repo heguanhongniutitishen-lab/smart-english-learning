@@ -62,5 +62,14 @@ it("returns only a different, published and human-approved question without answ
  assert.equal(Number((await p.query("SELECT count(*) n FROM outbox_events WHERE aggregate_id=$1 AND event_type='AttemptRecorded'",[graded.attempt.attempt_id])).rows[0].n),1);
  assert.equal((await p.query("SELECT status FROM error_cause_hypotheses WHERE error_cause_hypothesis_id=$1",[h.error_cause_hypothesis_id])).rows[0].status,"Candidate");
  assert.equal(Number((await p.query("SELECT count(*) n FROM micro_repair_tasks WHERE student_id=$1",[student.student_id])).rows[0].n),0);
+ const otherCause=(await p.query("INSERT INTO error_cause_hypotheses(error_observation_id,cause_code,confidence,status,source,rationale) VALUES($1,$2,.5,'Candidate','Rule',$3) RETURNING error_cause_hypothesis_id",[o.error_observation_id,"SECOND:"+crypto.randomUUID(),{target_type:"Knowledge",target_id:k.knowledge_id}])).rows[0];
+ await assert.rejects(()=>grader.linkEvidence(student.student_id,otherCause.error_cause_hypothesis_id,graded.attempt),e=>e.code==="VERIFICATION_EVIDENCE_LINK_CONFLICT");
+ assert.equal(Number((await p.query("SELECT count(*) n FROM error_cause_verifications WHERE attempt_id=$1",[graded.attempt.attempt_id])).rows[0].n),1);
+ await p.query("UPDATE error_cause_hypotheses SET status='Verified' WHERE error_cause_hypothesis_id=$1",[h.error_cause_hypothesis_id]);
+ const lateReplay=await grader.submit(student.student_id,h.error_cause_hypothesis_id,body,key);
+ assert.equal(lateReplay.attempt.attempt_id,graded.attempt.attempt_id);
+ assert.equal(Number((await p.query("SELECT count(*) n FROM error_cause_verifications WHERE attempt_id=$1",[graded.attempt.attempt_id])).rows[0].n),1);
+ assert.equal(Number((await p.query("SELECT count(*) n FROM micro_repair_tasks WHERE student_id=$1",[student.student_id])).rows[0].n),0);
+
  }finally{await p.end()}
 });
