@@ -34,7 +34,7 @@ async function showIndependentVerificationQuestion(original,hyp){
  try{
   const res=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(hyp.error_cause_hypothesis_id)}/question`,{headers:{"x-user-id":user}});
   const json=await res.json();if(!res.ok)throw new Error(json?.error?.message||"目前没有审核通过的独立确认题");
-  const question=normalizeQuestion(json.data??json);
+  const question=normalizeQuestion({content:(json.data??json).question});
   if(!question)throw new Error("独立确认题暂不支持此题型");
   const choice=question.type==="single_choice";
   player.innerHTML=`<div class="lesson"><div class="question-card"><span class="pill">独立确认练习 · 不直接判定掌握度</span><h2>${escapeHtml(question.prompt)}</h2><p class="micro">答案会提交给服务器判分并保存证据；单次作答不会直接确认错因。</p><div class="options">${choice?question.options.map((v,i)=>`<button class="option" data-v-index="${i}">${escapeHtml(v)}</button>`).join(""):'<input class="text-answer" id="verification-text" placeholder="输入答案"><button id="verification-submit">提交答案</button>'}</div><div id="verification-feedback"></div><button id="verification-return">返回学习主线</button></div></div>`;
