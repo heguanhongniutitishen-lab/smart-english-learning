@@ -22,7 +22,39 @@ const q=new URLSearchParams(location.search),student=q.get("student"),user=q.get
   node.append(heading,detail);node.classList.remove("hidden");
  }catch{/* A stale or unreachable status never becomes proof of a successful answer. */}
 }
-function render(v){session.today=v;const s=v.summary,p=Math.round((s.progress_ratio||0)*100);document.querySelector("#percent").textContent=p+"%";document.querySelector("#done").textContent=s.completed_tasks;document.querySelector("#minutes").textContent=s.estimated_total_minutes;document.querySelector("#pending").textContent=s.pending_tasks;document.querySelector("#hero-title").textContent=v.current_task?"继续今天的学习":"今天的任务完成啦";document.querySelector("#hero-copy").textContent=session.pendingCompletion?"上一项完成状态尚未确认，请先恢复进度。":v.current_task?`下一项：${labels[v.current_task.source_type]||v.current_task.source_type} · 约${Math.ceil(v.current_task.estimated_seconds/60)}分钟`:"今天可以收工，脑子也需要下班。";document.querySelector("#tasks").innerHTML=v.tasks.map((t,i)=>`<div class="task ${t.status==="Completed"?"done":""}"><span class="num">${i+1}</span><main><b>${labels[t.source_type]||t.source_type}</b><small>${escapeHtml(t.target_type)} · 约${Math.ceil(t.estimated_seconds/60)}分钟</small></main><span class="status">${t.status==="Completed"?"已完成":"待学习"}</span></div>`).join("")}function renderDemo(){render({summary:{completed_tasks:1,pending_tasks:2,estimated_total_minutes:20,progress_ratio:.35},current_task:{source_type:"SchoolSync",estimated_seconds:600},tasks:[{source_type:"Review",target_type:"Knowledge",estimated_seconds:300,status:"Completed"},{source_type:"SchoolSync",target_type:"Knowledge",estimated_seconds:600,status:"Pending"},{source_type:"SchoolSync",target_type:"Ability",estimated_seconds:300,status:"Pending"}]});document.querySelector("#hero-copy").textContent="演示模式 · 接入学生账号后会读取真实今日计划。"}function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function stageFromPlan(v){
+ const stage=v?.student?.current_stage||v?.student?.stage||v?.profile?.current_stage;
+ // Preview stage is only user-selected for the demo; real data never assumes the grade.
+ return ["Primary","Middle","High"].includes(stage)?stage:canUseDemoQuestions(student,user)?({"primary":"Primary","middle":"Middle","high":"High"}[q.get("stage")]||"Primary"):null;
+}
+function applyStage(v){
+ const stage=stageFromPlan(v);
+ document.body.dataset.stage=stage||"Unspecified";
+ const greeting=document.querySelector("#greeting"),sub=document.querySelector("#student-subtitle"),art=document.querySelector(".welcome-illustration");
+ const lines={Primary:["今天也要进步一点点","一步一步，轻松完成今日任务","📚"],Middle:["专注当下，稳步提升","跟上进度，巩固每一步","📘"],High:["保持节奏，持续积累","把时间用在今天最重要的学习上","📖"]};
+ const [hello,description,illustration]=lines[stage]||["今天开始，稳步向前","按照自己的节奏完成学习计划","📚"];
+ greeting.textContent=hello;sub.textContent=description;art.textContent=illustration;
+}
+function render(v){
+ session.today=v;applyStage(v);
+ const s=v.summary||{},tasks=Array.isArray(v.tasks)?v.tasks:[],ratio=Math.max(0,Math.min(1,Number(s.progress_ratio)||0)),p=Math.round(ratio*100);
+ document.querySelector("#percent").textContent=p+"%";
+ document.querySelector("#progress-fill").style.width=p+"%";
+ document.querySelector("#done").textContent=Number(s.completed_tasks)||0;
+ document.querySelector("#minutes").textContent=Number.isFinite(Number(s.estimated_total_minutes))?String(Number(s.estimated_total_minutes)):"--";
+ document.querySelector("#pending").textContent=Number(s.pending_tasks)||0;
+ const active=v.current_task,hasTasks=tasks.length>0;
+ document.querySelector("#hero-title").textContent=active?(p>0?"继续今天的学习":"今天的学习已准备好"):hasTasks?"今天的任务完成啦":"今日还没有安排任务";
+ document.querySelector("#hero-copy").textContent=session.pendingCompletion?"上一次任务的完成结果还未确认，请先恢复进度。":active?`下一项：${labels[active.source_type]||"学习任务"} · 约 ${Math.ceil((Number(active.estimated_seconds)||0)/60)} 分钟`:hasTasks?"今天先到这里，保持好自己的学习节奏。":"学习计划准备好后，会出现在这里。";
+ document.querySelector("#hero-duration").textContent=Number.isFinite(Number(s.estimated_total_minutes))?`预计 ${Number(s.estimated_total_minutes)} 分钟`:"今日计划";
+ const primary=document.querySelector("#start");
+ primary.textContent=session.pendingAnswer||session.pendingCompletion||session.pendingVerification?"恢复学习":active?(p>0?"继续今日学习 →":"开始今日学习 →"):"查看今日学习";
+ document.querySelector("#tasks").innerHTML=tasks.length?tasks.map((t,i)=>{
+  const kind=String(t.source_type||""),icons={SchoolSync:"▤",Review:"↻",Diagnostic:"◎",Repair:"✦",Expansion:"◇"},descriptions={SchoolSync:"跟随当前教材进度",Review:"回顾已经学过的内容",Diagnostic:"了解当前学习情况",Repair:"有针对性地巩固",Expansion:"拓展已有学习内容"};
+  return `<div class="task ${t.status==="Completed"?"done":""}" data-kind="${escapeHtml(kind)}"><span class="num" aria-hidden="true">${icons[kind]||"•"}</span><main><b>${escapeHtml(labels[kind]||kind||"学习任务")}</b><small>${escapeHtml(descriptions[kind]||"按计划完成本项学习")}</small></main><span class="status">${t.status==="Completed"?"已完成":t.status==="InProgress"?"进行中":"待开始"}</span></div>`;
+ }).join(""):'<div class="empty">今日暂无任务，稍后再来看看。</div>';
+}
+function renderDemo(){render({summary:{completed_tasks:1,pending_tasks:2,estimated_total_minutes:20,progress_ratio:.35},current_task:{source_type:"SchoolSync",estimated_seconds:600},tasks:[{source_type:"Review",target_type:"Knowledge",estimated_seconds:300,status:"Completed"},{source_type:"SchoolSync",target_type:"Knowledge",estimated_seconds:600,status:"Pending"},{source_type:"SchoolSync",target_type:"Ability",estimated_seconds:300,status:"Pending"}]});document.querySelector("#hero-copy").textContent="演示模式 · 接入学生账号后会读取真实今日计划。"}function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 const session={today:null,liveQuestion:null,activeQuestion:null,feedback:null,stats:createSessionStats(),pendingAnswer:readPendingAnswer(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user}),pendingCompletion:readPendingCompletion(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user}),pendingVerification:readPendingVerification(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user,date})};let flowState=Flow.HOME;function setFlow(next){flowState=transition(flowState,next);document.querySelector("#player")?.setAttribute("data-flow-state",next)}
 const demoQuestions=[
  {prompt:"Choose the best answer: My brother ___ football after school.",options:["play","plays","playing","played"],answer:1,explain:"主语 My brother 是第三人称单数。一般现在时中，动词 play 要变成 plays。",repair:"记住一个小判断：先找主语。he / she / it 或单个人名，在一般现在时肯定句里，动词通常要加 -s / -es。"},
@@ -123,4 +155,17 @@ async function verifyCause(hyp,result,x){try{const out=await apiPost(`/api/v1/st
 function showRealRepair(task,x){setFlow(Flow.REPAIRING);document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><span class="pill">针对性修复</span><h2>把刚才卡住的点再理顺一次</h2><div class="repair-box"><p>${escapeHtml(x.repair)}</p><p class="micro">预计 ${Math.ceil(Number(task.estimated_seconds||180)/60)} 分钟 · 完成后返回主线</p></div><button class="primary-wide" id="repair-complete">我已经完成这次修复</button></div></div>`;document.querySelector("#repair-complete").onclick=()=>completeRealRepair(task)}
 async function completeRealRepair(task){try{await apiPost(`/api/v1/students/${encodeURIComponent(student)}/feedback/repairs/${encodeURIComponent(task.micro_repair_task_id)}/complete`,{plan_date:date});document.querySelector("#player").innerHTML='<div class="lesson success"><div class="check">✓</div><h2>修复完成</h2><p>这次只处理刚才真正卡住的点，现在回到今日主线。</p><button id="return-main">返回主线</button></div>';document.querySelector("#return-main").onclick=finishLiveTask}catch(e){document.querySelector("#player").insertAdjacentHTML("beforeend",`<div class="feedback-box">完成记录失败：${escapeHtml(e.message)}</div>`)}}
 
-document.querySelector("#start").onclick=openPlayer;load();
+document.querySelector("#start").onclick=openPlayer;
+document.querySelectorAll("[data-nav]").forEach(button=>button.onclick=()=>{
+ const destination=button.dataset.nav;
+ if(destination==="study")return openPlayer();
+ if(destination==="growth")return document.querySelector("#growth-heading")?.scrollIntoView({behavior:"smooth",block:"start"});
+ if(destination==="mine")return showPlayerNoticeForNavigation();
+ window.scrollTo({top:0,behavior:"smooth"});
+});
+function showPlayerNoticeForNavigation(){
+ const player=document.querySelector("#player");
+ player.classList.remove("hidden");
+ showPlayerNotice("我的学习空间","个人中心将在正式账号与资料服务接入后开放。现在可以继续今日学习。");
+}
+load();
