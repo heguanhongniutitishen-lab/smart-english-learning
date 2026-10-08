@@ -2,7 +2,7 @@ const names={SchoolSync:"跟校巩固",Review:"复习",Diagnostic:"诊断",Repai
 const themes={Primary:["今天也要进步一点点","一步一步，轻松完成今日任务","#2b8af3"],Middle:["专注当下，稳步提升","跟上进度，巩固每一步","#2d81f2"],High:["保持节奏，持续积累","把时间用在今天最重要的学习上","#244f83"],Unspecified:["今天开始，稳步向前","按照自己的节奏完成学习计划","#287cf0"]};
 function safeNumber(value){return typeof value==="number"&&Number.isFinite(value)&&value>=0?value:null;}
 Page({
- data:{stage:"Unspecified",greeting:themes.Unspecified[0],subtitle:themes.Unspecified[1],primary:themes.Unspecified[2],authorized:false,loggingIn:false,error:"",heroTitle:"等待读取今日计划",heroDescription:"请先完成学生身份认证",progressText:"--",progressPercent:0,completedText:"--",minutesText:"--",pendingText:"--",tasks:[],focusText:"暂无经过独立证据审查的薄弱点结论。",growthText:"登录后读取真实学习记录。",goalText:"登录后展示今日学习任务。",canStart:false,startLabel:"答题模块尚未接入"},
+ data:{stage:"Unspecified",greeting:themes.Unspecified[0],subtitle:themes.Unspecified[1],primary:themes.Unspecified[2],authorized:false,loggingIn:false,boundStudents:[],error:"",heroTitle:"等待读取今日计划",heroDescription:"请先完成学生身份认证",progressText:"--",progressPercent:0,completedText:"--",minutesText:"--",pendingText:"--",tasks:[],focusText:"暂无经过独立证据审查的薄弱点结论。",growthText:"登录后读取真实学习记录。",goalText:"登录后展示今日学习任务。",canStart:false,startLabel:"答题模块尚未接入"},
  onShow(){this.load();},
  async login(){
   this.setData({loggingIn:true,error:""});
@@ -12,16 +12,27 @@ Page({
    const result=await new Promise((resolve,reject)=>wx.request({url:(base.endsWith("/")?base.slice(0,-1):base)+"/api/v1/students/me/bindings",header:{Authorization:"Bearer "+auth.token},success:r=>r.statusCode>=200&&r.statusCode<300?resolve(r.data?.data??r.data):reject(Error("无法验证学生绑定关系")),fail:()=>reject(Error("学生绑定查询失败"))}));
    const students=result?.students;
    if(!Array.isArray(students))throw Error("绑定查询响应无效");
-   if(students.length!==1){
-    this.setData({error:students.length?"此账号绑定多个学生，需完成学生选择功能后才能进入学习。":"当前微信账号尚未绑定有效学生，请联系管理员。"});
-    return;
-   }
-   const selected=students[0];
-   if(typeof selected.student_id!=="string"||!["Primary","Middle","High"].includes(selected.current_stage))throw Error("学生绑定资料不完整");
-   getApp().globalData.auth={...auth,studentId:selected.student_id,stage:selected.current_stage};
-   await this.load();
+   this.setData({boundStudents:students.filter(s=>typeof s.student_id==="string"&&["Primary","Middle","High"].includes(s.current_stage)).map(s=>({student_id:s.student_id,display_name:String(s.display_name||"学生"),current_stage:s.current_stage}))});
+   if(students.length===0){this.setData({error:"当前微信账号尚未绑定有效学生，请联系管理员。"});return;}
+   if(students.length===1){await this.selectBoundStudent(students[0]);return;}
+   this.setData({error:"请选择要学习的学生账号。"});
+
   }catch(e){this.setData({error:e?.message||"登录未完成"});}
   finally{this.setData({loggingIn:false});}
+ },
+ async chooseStudent(event){
+  const id=event.currentTarget.dataset.studentId;
+  const selected=this.data.boundStudents.find(s=>s.student_id===id);
+  if(!selected)return;
+  await this.selectBoundStudent(selected);
+ },
+ async selectBoundStudent(selected){
+  const app=getApp(),auth=app.globalData.auth;
+  if(!auth?.token||Date.now()>=auth.expiresAt)throw Error("登录已过期，请重新验证");
+  if(!this.data.boundStudents.some(s=>s.student_id===selected.student_id))throw Error("学生不在当前授权名单");
+  app.globalData.auth={...auth,studentId:selected.student_id,stage:selected.current_stage};
+  this.setData({boundStudents:[],error:"",authorized:false,tasks:[],completedText:"--",pendingText:"--",minutesText:"--",progressText:"--",progressPercent:0,focusText:"正在读取学习记录。",growthText:"正在读取学习记录。",goalText:"正在读取今日目标。"});
+  await this.load();
  },
  request(path){const {apiBase,auth}=getApp().globalData;if(!apiBase||!auth?.token||!auth?.studentId||Date.now()>=auth.expiresAt)return Promise.reject(Error("尚未接入正式登录会话"));return new Promise((resolve,reject)=>wx.request({url:apiBase+path,header:{Authorization:"Bearer "+auth.token},success:r=>r.statusCode>=200&&r.statusCode<300?resolve(r.data?.data??r.data):reject(Error("服务器未返回可用记录")),fail:()=>reject(Error("网络不可用"))}));},
  async load(){const {apiBase,auth}=getApp().globalData;if(!apiBase||!auth?.token||!auth?.studentId||Date.now()>=auth.expiresAt){this.setData({authorized:false,error:"",canStart:false});return;}this.setData({authorized:true,error:"",canStart:false});const now=new Date(),date=[now.getFullYear(),String(now.getMonth()+1).padStart(2,"0"),String(now.getDate()).padStart(2,"0")].join("-"),id=encodeURIComponent(auth.studentId);
