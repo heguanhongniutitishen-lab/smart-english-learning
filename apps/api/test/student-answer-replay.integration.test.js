@@ -21,6 +21,8 @@ it("replays the same persisted answer after its task is no longer Pending, rejec
  const replay=await svc.submit(student.student_id,{...input,answer_payload:{choice_index:1}},requestId);
  assert.equal(replay.attempt_id,first.attempt_id);assert.equal(replay.explanation_payload.text,"goes is correct");
  await assert.rejects(()=>svc.submit(student.student_id,{...input,answer_payload:{choice_index:0}},requestId),e=>e.code==="STUDENT_ANSWER_IDEMPOTENCY_CONFLICT"&&e.status===409);
+ await assert.rejects(()=>svc.submit(student.student_id,{...input,daily_task_id:crypto.randomUUID()},requestId),e=>e.code==="STUDENT_ANSWER_IDEMPOTENCY_CONFLICT"&&e.status===409);
+ await assert.rejects(()=>svc.submit(student.student_id,{...input,content_version_id:crypto.randomUUID()},requestId),e=>e.code==="STUDENT_ANSWER_IDEMPOTENCY_CONFLICT"&&e.status===409);
  assert.equal(Number((await pool.query("SELECT count(*) AS n FROM question_attempts WHERE student_id=$1 AND request_id=$2",[student.student_id,requestId])).rows[0].n),1);
  assert.equal(Number((await pool.query("SELECT count(*) AS n FROM outbox_events WHERE aggregate_id=$1 AND event_type='AttemptRecorded'",[first.attempt_id])).rows[0].n),1);
  }finally{await pool.end()}
