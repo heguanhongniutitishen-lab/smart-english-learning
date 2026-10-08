@@ -117,5 +117,41 @@ try{
  assert.equal(Number((await pool.query("SELECT count(*) AS n FROM daily_tasks t JOIN daily_plans p USING(daily_plan_id) WHERE p.student_id=$1 AND t.status='Completed'",[wrongFixture.studentId])).rows[0].n),2);
  assert.deepEqual(wrongErrors,[]);
  console.log("PASS real wrong answer: independent graded question saved; cause stays Candidate; no unverified repair; return to mainline");
+ // Simulate the server persisting the answer while the browser loses the response.
+ const recoveryFixture=await seed();
+ const recoveryItem=(await pool.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Published') RETURNING content_id")).rows[0];
+ const recoveryVersion=(await pool.query("INSERT INTO content_versions(content_id,version_no,payload,answer_payload,explanation_payload,review_status,reviewed_by,reviewed_at,published_at) VALUES($1,1,$2,$3,$4,'Approved',$5,now(),now()-interval '1 day') RETURNING content_version_id",[recoveryItem.content_id,{stem:"They ___ English.",options:["studies","study"]},{correct_index:1},{text:"plural verb"},recoveryFixture.userId])).rows[0];
+ await pool.query("UPDATE content_items SET current_version_id=$2 WHERE content_id=$1",[recoveryItem.content_id,recoveryVersion.content_version_id]);
+ await pool.query("INSERT INTO content_knowledge(content_version_id,knowledge_id,role,weight,purpose,review_status) VALUES($1,$2,'PrimaryTested',1,'Learn','Approved')",[recoveryVersion.content_version_id,recoveryFixture.knowledgeIds[0]]);
+ const recoveryPage=await browser.newPage();
+ const recoveryErrors=[];recoveryPage.on("pageerror",e=>recoveryErrors.push(e.message));
+ await recoveryPage.goto(`http://127.0.0.1:${webPort}/?student=${recoveryFixture.studentId}&user=${recoveryFixture.userId}&date=${date}`);
+ await recoveryPage.getByRole("button",{name:"开始今日学习"}).click();
+ await recoveryPage.getByRole("heading",{name:"My brother ___ football."}).waitFor();
+ await recoveryPage.locator(".option").nth(0).click();
+ await recoveryPage.getByText("这里卡了一下").waitFor();
+ await recoveryPage.getByRole("button",{name:"回顾错题解析"}).click();
+ await recoveryPage.getByRole("button",{name:"做一道独立确认练习"}).click();
+ await recoveryPage.getByRole("heading",{name:"They ___ English."}).waitFor();
+ let intercepted=0;
+ await recoveryPage.route("**/feedback/causes/*/question/answer",async(route)=>{
+  if(intercepted++===0){const response=await route.fetch();assert.equal(response.status(),201);await route.abort("failed");return}
+  await route.continue();
+ });
+ await recoveryPage.locator("[data-v-index]").nth(1).click();
+ await recoveryPage.getByText("提交结果尚未确认").waitFor();
+ const beforeReload=(await pool.query("SELECT attempt_id,request_id FROM question_attempts WHERE student_id=$1 AND exposure_type='Verification'",[recoveryFixture.studentId])).rows;
+ assert.equal(beforeReload.length,1);
+ await recoveryPage.reload();
+ await recoveryPage.getByRole("button",{name:"开始今日学习"}).click();
+ await recoveryPage.getByRole("heading",{name:"恢复确认练习"}).waitFor();
+ await recoveryPage.getByRole("button",{name:"重试原确认题答案"}).click();
+ await recoveryPage.getByRole("heading",{name:"确认练习已恢复"}).waitFor();
+ const afterReload=(await pool.query("SELECT attempt_id,request_id FROM question_attempts WHERE student_id=$1 AND exposure_type='Verification'",[recoveryFixture.studentId])).rows;
+ assert.deepEqual(afterReload,beforeReload);
+ assert.equal(Number((await pool.query("SELECT count(*) AS n FROM error_cause_verifications v JOIN question_attempts a ON a.attempt_id=v.attempt_id WHERE a.student_id=$1",[recoveryFixture.studentId])).rows[0].n),1);
+ assert.deepEqual(recoveryErrors,[]);
+ console.log("PASS confirmation recovery: lost HTTP acknowledgement -> reload -> same-key replay -> one attempt and one evidence");
+
 
 }finally{await browser?.close();for(const child of children)child.kill("SIGTERM");await pool.end()}
