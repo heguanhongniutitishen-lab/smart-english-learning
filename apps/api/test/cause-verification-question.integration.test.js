@@ -46,6 +46,16 @@ it("returns only a different, published and human-approved question without answ
  assert.equal(evidence[0].content_version_id,independent.content_version_id);
  assert.equal(evidence[0].verification_type,"Question");
  assert.equal(evidence[0].result,null);
+ const unrelated=(await p.query("INSERT INTO knowledge_points(level,domain,code,name) VALUES(1,'Grammar',$1,'unrelated knowledge') RETURNING knowledge_id",["VQ-UNRELATED-"+crypto.randomUUID()])).rows[0];
+ const foreignItem=(await p.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Published') RETURNING content_id")).rows[0];
+ const foreignVersion=(await p.query("INSERT INTO content_versions(content_id,version_no,payload,answer_payload,review_status,reviewed_by,reviewed_at,published_at) VALUES($1,1,$2,$3,'Approved',$4,now(),now()) RETURNING content_version_id",[foreignItem.content_id,{stem:"unrelated",options:["a","b"]},{correct_index:1},reviewer.user_id])).rows[0];
+ await p.query("UPDATE content_items SET current_version_id=$2 WHERE content_id=$1",[foreignItem.content_id,foreignVersion.content_version_id]);
+ await p.query("INSERT INTO content_knowledge(content_version_id,knowledge_id,role,weight,purpose,review_status) VALUES($1,$2,'PrimaryTested',1,'Learn','Approved')",[foreignVersion.content_version_id,unrelated.knowledge_id]);
+ const unrelatedAttempt=await new LearningPostgresRepository(p).createAttempt(student.student_id,{content_version_id:foreignVersion.content_version_id,request_id:"v-unrelated-"+crypto.randomUUID(),answer_payload:{choice_index:0},result:"Wrong",exposure_type:"Verification",technical_status:"OK"});
+ await assert.rejects(()=>grader.linkEvidence(student.student_id,h.error_cause_hypothesis_id,unrelatedAttempt),e=>e.code==="VERIFICATION_EVIDENCE_LINK_CONFLICT");
+ const unrelatedEvidence=Number((await p.query("SELECT count(*) AS n FROM error_cause_verifications WHERE attempt_id=$1",[unrelatedAttempt.attempt_id])).rows[0].n);
+ assert.equal(unrelatedEvidence,0);
+
 
  await assert.rejects(()=>grader.submit(student.student_id,h.error_cause_hypothesis_id,{...body,answer_payload:{choice_index:1}},key),e=>e.code==="VERIFICATION_REPLAY_CONFLICT");
  assert.equal(Number((await p.query("SELECT count(*) n FROM question_attempts WHERE student_id=$1 AND request_id=$2",[student.student_id,key])).rows[0].n),1);
