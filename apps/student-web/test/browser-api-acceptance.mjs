@@ -117,7 +117,7 @@ try{
  await wrongPage.getByRole("heading",{name:"She ___ to school."}).waitFor();
  await wrongPage.locator(".option").nth(1).click();
  await wrongPage.getByText("答对了").waitFor();
- await wrongPage.getByRole("button",{name:"继续"}).click();
+ await wrongPage.getByRole("button",{name:"继续",exact:true}).click();
  await wrongPage.getByRole("heading",{name:"这一小段完成了"}).waitFor();
  const wrongAttempts=(await pool.query("SELECT result FROM question_attempts WHERE student_id=$1 AND daily_task_id IS NOT NULL ORDER BY occurred_at",[wrongFixture.studentId])).rows;
  assert.deepEqual(wrongAttempts.map(x=>x.result),["Wrong","Correct"]);
