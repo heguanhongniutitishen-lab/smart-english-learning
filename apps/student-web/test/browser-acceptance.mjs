@@ -22,6 +22,22 @@ async function run(){
  await page.locator("#start").waitFor();
  assert.match(await page.locator("#start").innerText(),/开始今日学习|继续今日学习/);
  await page.getByRole("heading",{name:"学习目标"}).waitFor();
+ for(const stage of ["primary","middle","high"]){
+  for(const width of [320,390,430]){
+   const preview=await browser.newPage({viewport:{width,height:844}});
+   const runtimeErrors=[];
+   preview.on("pageerror",error=>runtimeErrors.push(error.message));
+   await preview.goto(`http://127.0.0.1:${port}/?stage=${stage}`);
+   await preview.getByRole("heading",{name:"学习目标"}).waitFor();
+   await preview.locator("#tasks .task").first().waitFor();
+   assert.equal(await preview.locator("body").getAttribute("data-stage"),({primary:"Primary",middle:"Middle",high:"High"})[stage]);
+   const extent=await preview.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
+   assert.ok(extent.scroll<=extent.viewport+1,`Horizontal overflow at ${stage}/${width}: ${JSON.stringify(extent)}`);
+   assert.equal(runtimeErrors.length,0,`Browser errors in ${stage}/${width}: ${runtimeErrors.join("; ")}`);
+   await preview.close();
+  }
+ }
+ console.log("PASS browser: Primary/Middle/High home at 320/390/430px without horizontal overflow");
  await page.locator("#start").click();
  await page.getByRole("heading",{name:/My brother/}).waitFor();
  await page.locator(".option").nth(0).click();
