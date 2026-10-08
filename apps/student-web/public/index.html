@@ -1,1 +1,52 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>英语学习 · 学生端</title><link rel="stylesheet" href="/styles.css"></head><body><main class="shell"><header><div><p class="eyebrow">SMART ENGLISH</p><h1>下午好，今天继续进步一点点。</h1><p class="muted">五年级 · 跟校学习</p></div><div class="avatar">五</div></header><section id="development-identity-warning" class="identity-warning hidden" role="status">开发联调身份模式：地址栏中的用户和学生 ID 不等于正式登录凭证，请勿接入真实学生资料。</section><section class="hero"><div><span class="pill">今日学习</span><h2 id="hero-title">准备好了吗？</h2><p id="hero-copy">先完成最重要的一小步，不用一次塞满脑袋。</p><button id="start">开始今日学习</button></div><div class="ring"><strong id="percent">0%</strong><span>今日进度</span></div></section><section id="confirmation-receipt" class="note hidden" aria-live="polite"></section><section class="stats"><article><b id="done">0</b><span>已完成任务</span></article><article><b id="minutes">--</b><span>预计分钟</span></article><article><b id="pending">--</b><span>待完成</span></article></section><section><div class="section-title"><h3>今天学什么</h3><span id="date"></span></div><div id="tasks" class="tasks"><div class="empty">正在读取今日学习计划…</div></div></section><section class="note"><b>学习节奏</b><p>先理解，再练习。答错会进入针对性修复，完成后回到主线，不把一次错误变成无休止刷题。</p></section><section id="player" class="player hidden"></section></main><script type="module" src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>今日学习 · 学生端</title><link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="shell">
+ <header class="welcome">
+  <div class="welcome-copy">
+   <p class="eyebrow">SMART ENGLISH · 今日学习</p>
+   <h1 id="greeting">你好，今天一起进步</h1>
+   <p class="muted" id="student-subtitle">按照自己的节奏，完成今天的学习</p>
+  </div>
+  <div class="welcome-art" aria-hidden="true"><span class="sun-dot">✦</span><span class="welcome-illustration">📚</span></div>
+ </header>
+ <section id="development-identity-warning" class="identity-warning hidden" role="status">开发联调身份模式：地址栏中的用户和学生 ID 不等于正式登录凭证，请勿接入真实学生资料。</section>
+ <section class="hero" aria-labelledby="hero-title">
+  <div class="hero-top"><span class="hero-label">今日学习计划</span><span class="hero-duration" id="hero-duration">今日任务</span></div>
+  <h2 id="hero-title">正在准备你的学习计划…</h2>
+  <p id="hero-copy">完成今日安排，逐步积累进步。</p>
+  <div class="hero-progress"><div class="hero-progress-title"><span id="progress-label">今日任务进度</span><strong id="percent">0%</strong></div><div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div></div>
+  <button id="start" class="start-button">开始今日学习 <span aria-hidden="true">→</span></button>
+ </section>
+ <section id="confirmation-receipt" class="receipt hidden" aria-live="polite"></section>
+ <section class="stats" aria-label="今日学习数据">
+  <article><span class="stat-icon stat-done" aria-hidden="true">✓</span><b id="done">0</b><span>已完成任务</span></article>
+  <article><span class="stat-icon stat-time" aria-hidden="true">◷</span><b id="minutes">--</b><span>预计学习分钟</span></article>
+  <article><span class="stat-icon stat-left" aria-hidden="true">▥</span><b id="pending">--</b><span>待完成任务</span></article>
+ </section>
+ <section class="learning-section" aria-labelledby="task-heading">
+  <div class="section-title"><h3 id="task-heading">今天学什么</h3><span id="date"></span></div>
+  <div id="tasks" class="tasks"><div class="empty">正在读取今日学习计划…</div></div>
+ </section>
+ <section class="learning-section secondary-section" aria-labelledby="focus-heading">
+  <div class="section-title"><h3 id="focus-heading">你最近更需要关注</h3></div>
+  <div id="focus-summary" class="quiet-card"><span class="quiet-symbol" aria-hidden="true">◎</span><p>先完成今日计划，后续将根据真实学习记录展示需要关注的内容。</p></div>
+ </section>
+ <section class="learning-section secondary-section" aria-labelledby="growth-heading">
+  <div class="section-title"><h3 id="growth-heading">学习成长</h3></div>
+  <div class="quiet-card"><span class="quiet-symbol growth-symbol" aria-hidden="true">↗</span><p>每一次完成都有记录。更详细的学习趋势将在数据接入后展示。</p></div>
+ </section>
+ <nav class="bottom-nav" aria-label="学生端导航">
+  <button type="button" class="nav-item selected" data-nav="home" aria-current="page"><span aria-hidden="true">⌂</span>首页</button>
+  <button type="button" class="nav-item" data-nav="study"><span aria-hidden="true">▤</span>学习</button>
+  <button type="button" class="nav-item" data-nav="growth"><span aria-hidden="true">♧</span>成长</button>
+  <button type="button" class="nav-item" data-nav="mine"><span aria-hidden="true">◯</span>我的</button>
+ </nav>
+ <section id="player" class="player hidden"></section>
+</main>
+<script type="module" src="/app.js"></script>
+</body></html>
