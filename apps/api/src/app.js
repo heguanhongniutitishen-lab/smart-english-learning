@@ -12,6 +12,10 @@ if(feedbackHandler&&u.pathname.includes("/feedback/")){const handled=await feedb
 if(diagnosticHandler&&(u.pathname.includes("/diagnostic")||u.pathname.endsWith("/onboarding"))){const handled=await diagnosticHandler(req,res,u,id);if(handled!==false)return handled;}
 if(dailyPlanHandler&&u.pathname.includes("/daily-")){const handled=await dailyPlanHandler(req,res,u,id);if(handled!==false)return handled;}
 if(researchHandler&&u.pathname.startsWith("/api/v1/research/")){const handled=await researchHandler(req,res,u,id);if(handled!==false)return handled;}
+if(req.method==="GET"&&u.pathname==="/api/v1/students/me/bindings"){
+ if(studentAuthOptions?.mode!=="signed")return fail(res,403,"AUTH_SIGNED_MODE_REQUIRED","student binding discovery requires signed mode",id);
+ return ok(res,{students:await store.listBoundStudents(String(req.headers["x-user-id"]||""))},id);
+}
 if(req.method==="GET"&&u.pathname==="/health")return ok(res,{status:"ok",service:"smart-english-api"},id);
 if(req.method==="GET"&&u.pathname==="/health/ready"){if(typeof store.health==="function")await store.health();return ok(res,{status:"ready"},id);}
 if(req.method==="POST"&&u.pathname==="/api/v1/auth/wechat/code-exchange"){
