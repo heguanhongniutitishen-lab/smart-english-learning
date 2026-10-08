@@ -81,3 +81,7 @@ A persisted independent verification attempt may belong to only one candidate ca
 ## Original wrong-answer provenance gate
 
 Read-only cause evidence audit now checks the initiating error observation against its original question attempt: the original attempt must belong to the same student, refer to the observed content version, have technical status `OK`, and actually be graded `Wrong`. A valid independent confirmation cannot make an invalid original observation eligible for cause adjudication. The outcome stays `PendingReview`; this remains an audit-only safeguard, not an automatic cause verdict or repair trigger.
+
+## Student-scoped evidence status (read only)
+
+`GET /api/v1/students/:studentId/feedback/causes/:hypothesisId/evidence-status` exposes only `PendingReview`, eligible-answer counts, correct/wrong counts and reason codes to the bound student. It omits private rationale, answer keys, original attempt details and internal hypothesis confidence. It does **not** adjudicate causes, update mastery or generate repairs. This is a status readout, not an approved cause-verdict algorithm. The endpoint has an authorization unit test and a real API + Chromium acceptance assertion.
