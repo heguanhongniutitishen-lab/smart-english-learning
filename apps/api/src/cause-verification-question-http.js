@@ -1,8 +1,18 @@
-import {ok,fail} from "./http.js";
-export function createCauseVerificationQuestionHttpHandler({store,readModel}){return async(req,res,u,id)=>{
- const match=u.pathname.match(/^\/api\/v1\/students\/([^/]+)\/feedback\/causes\/([^/]+)\/question$/);
- if(req.method!=="GET"||!match)return false;
+import {ok,fail,readJson} from "./http.js";
+export function createCauseVerificationQuestionHttpHandler({store,readModel,answerService}){return async(req,res,u,id)=>{
+ const get=u.pathname.match(/^\/api\/v1\/students\/([^/]+)\/feedback\/causes\/([^/]+)\/question$/);
+ const post=u.pathname.match(/^\/api\/v1\/students\/([^/]+)\/feedback\/causes\/([^/]+)\/question\/answer$/);
+ const match=req.method==="GET"?get:req.method==="POST"?post:null;
+ if(!match)return false;
  if(!await store.owns(String(req.headers["x-user-id"]||""),match[1]))return fail(res,403,"STUDENT_FORBIDDEN","student is not bound to user",id);
+ if(req.method==="POST"){
+  const key=String(req.headers["idempotency-key"]||"").trim();
+  if(!key)return fail(res,400,"IDEMPOTENCY_KEY_REQUIRED","Idempotency-Key is required",id);
+  const body=await readJson(req);
+  if(!body.content_version_id||!body.answer_payload)return fail(res,400,"VERIFICATION_ANSWER_INVALID","content_version_id and answer_payload are required",id);
+  const result=await answerService.submit(match[1],match[2],body,key);
+  return ok(res,result,id,201);
+ }
  const view=await readModel.forHypothesis(match[1],match[2]);
  if(!view)return fail(res,404,"ERROR_CAUSE_NOT_FOUND","error cause not found",id);
  if(!view.question)return fail(res,404,"VERIFICATION_QUESTION_UNAVAILABLE",view.reason,id);
