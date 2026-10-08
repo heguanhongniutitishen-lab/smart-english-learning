@@ -51,7 +51,21 @@ async function showIndependentVerificationQuestion(original,hyp){
     const response=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(hyp.error_cause_hypothesis_id)}/question/answer`,{method:"POST",headers:{"content-type":"application/json","x-user-id":user,"idempotency-key":pending.key},body:JSON.stringify(body)});
     const outcome=await response.json();if(!response.ok)throw new Error(outcome?.error?.message||"提交失败");
     const result=(outcome.data??outcome).attempt?.result;
-    document.querySelector("#verification-feedback").innerHTML=`<div class="feedback-box"><b>${result==="Correct"?"本题答对了":"本题答错了"}</b><p>这次作答已记录。错因是否成立仍需独立证据规则确认，暂不生成修复任务。</p></div>`;
+    const feedbackBox=document.querySelector("#verification-feedback");
+    feedbackBox.innerHTML=`<div class="feedback-box"><b>${result==="Correct"?"本题答对了":"本题答错了"}</b><p>这次作答已记录。错因是否成立仍需独立证据规则确认，暂不生成修复任务。</p><div id="cause-evidence-status" aria-live="polite">正在核对证据状态…</div></div>`;
+    try{
+     const statusResponse=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(hyp.error_cause_hypothesis_id)}/evidence-status`,{headers:{"x-user-id":user}});
+     const statusJson=await statusResponse.json();
+     if(!statusResponse.ok)throw new Error(statusJson?.error?.message||"状态查询失败");
+     const status=statusJson.data??statusJson;
+     const node=document.querySelector("#cause-evidence-status");
+     if(node)node.innerHTML=status.state==="PendingReview"
+       ?`<p><b>错因待审查</b> · 已核验 ${Number(status.eligible_attempt_count)||0} 条独立作答证据（答对 ${Number(status.correct_count)||0}，答错 ${Number(status.wrong_count)||0}）。</p><p class="micro">证据已记录，但尚不足以确认具体错因或判定掌握。</p>`
+       :'<p>证据状态待进一步确认。</p>';
+    }catch(statusError){
+     const node=document.querySelector("#cause-evidence-status");
+     if(node)node.textContent="作答已保存，但证据状态暂时无法读取，可返回主线继续学习。";
+    }
    }catch(e){
     document.querySelector("#verification-feedback").innerHTML=`<div class="feedback-box">提交结果尚未确认：${escapeHtml(e.message)}<button id="verification-retry">重试原答案</button></div>`;
     document.querySelector("#verification-retry").onclick=()=>submit(pending.value);
