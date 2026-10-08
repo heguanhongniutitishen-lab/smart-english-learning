@@ -15,6 +15,7 @@ export class PostgresStore{
   await c.query(`INSERT INTO student_user_bindings(binding_id,student_id,user_id,role,status) VALUES($1,$2,$3,'Student','Active')`,[randomUUID(),s.student_id,userId]);
   return s;
  });}
+ async listBoundStudents(userId){const r=await this.pool.query("SELECT s.student_id,s.display_name,s.current_stage,s.current_grade FROM student_user_bindings b JOIN students s ON s.student_id=b.student_id WHERE b.user_id=$1 AND b.status='Active' AND s.status='Active' ORDER BY s.created_at,s.student_id",[userId]);return r.rows;}
  async owns(userId,studentId){const r=await this.pool.query(`SELECT 1 FROM student_user_bindings WHERE user_id=$1 AND student_id=$2 AND status='Active' LIMIT 1`,[userId,studentId]);return r.rowCount>0;}
  async addConfig(studentId,i){return (await this.pool.query(`INSERT INTO student_config_history(config_id,student_id,primary_goal,secondary_goal,daily_minutes,exam_date,exam_target,source)
  VALUES($1,$2,$3,$4,$5,$6,$7,'Student') RETURNING *`,[randomUUID(),studentId,i.primary_goal,i.secondary_goal??null,i.daily_minutes,i.exam_date??null,i.exam_target??null])).rows[0];}

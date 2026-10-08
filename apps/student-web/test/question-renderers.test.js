@@ -1,0 +1,4 @@
+import test from"node:test";import assert from"node:assert/strict";import{normalizeQuestion,evaluateAnswer,attemptAnswerPayload}from"../public/question-renderers.js";
+test("renders single choice without needing an answer key",()=>{const q=normalizeQuestion({content:{content_version_id:"v1",payload:{stem:"He ___ home.",options:["go","goes"]}}});assert.equal(q.type,"single_choice");assert.equal(evaluateAnswer(q,1),false);assert.deepEqual(attemptAnswerPayload(q,0),{choice_index:0});});
+test("renders explicit text input without answer keys",()=>{const q=normalizeQuestion({content:{content_version_id:"v2",payload:{prompt:"Write the word",input_type:"text",placeholder:"word"}}});assert.equal(q.type,"text_input");assert.equal(evaluateAnswer(q,"usually"),false);assert.deepEqual(attemptAnswerPayload(q,"Usually"),{answer:"Usually"});});
+test("rejects unsupported content instead of guessing",()=>assert.equal(normalizeQuestion({content:{payload:{stem:"x"}}}),null));

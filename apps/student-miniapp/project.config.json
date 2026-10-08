@@ -1,0 +1,9 @@
+{
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "smart-english-student",
+  "miniprogramRoot": "./",
+  "setting": {
+    "es6": true
+  }
+}

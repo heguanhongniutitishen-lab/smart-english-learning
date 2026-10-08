@@ -1,0 +1,194 @@
+import {saveConfirmationReceipt,readConfirmationReceipt,clearConfirmationReceipt} from "./confirmation-receipt.js";
+import {savePendingVerification,readPendingVerification,clearPendingVerification,verificationReplayRequest} from "./verification-recovery.js";
+import {recoveryPriority,canBeginTaskCompletion} from "./recovery-priority.js";
+import {isTaskCompleted,shouldRetryCompletion,savePendingCompletion,readPendingCompletion,clearPendingCompletion} from "./task-completion-recovery.js";
+import {prepareAnswerSubmission,shouldKeepPendingAnswer,savePendingAnswer,readPendingAnswer,clearPendingAnswer,pendingTaskChanged,pendingReplayRequest} from "./answer-submission.js";
+import {createSessionStats,recordAnswer,recordRepairPractice,completionMessage} from "./session-summary.js";
+import {normalizeQuestion,evaluateAnswer,attemptAnswerPayload} from "./question-renderers.js";
+import {Flow,transition,canSubmitAnswer,canCompleteTask,canUseDemoQuestions,completionFailureCopy} from "./flow-state.js";
+const q=new URLSearchParams(location.search),student=q.get("student"),user=q.get("user"),api=q.get("api")||"",date=q.get("date")||new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Shanghai"}).format(new Date());document.querySelector("#date").textContent=date;if(student&&user)document.querySelector("#development-identity-warning")?.classList.remove("hidden");const labels={SchoolSync:"跟校巩固",Review:"复习",Diagnostic:"诊断",Repair:"错题修复",Expansion:"拓展"};async function load(){if(!student||!user){if(canUseDemoQuestions(student,user)){renderDemo();return}document.querySelector("#tasks").innerHTML='<div class="empty">学生和用户身份参数需要同时提供，无法进入真实学习。</div>';return}try{const r=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/today?date=${date}`,{headers:{"x-user-id":user}}),j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"读取失败");render(j.data??j);await Promise.allSettled([refreshConfirmationReceipt(),loadGrowthSummary()])}catch(e){document.querySelector("#tasks").innerHTML=`<div class="empty">暂时没有读到今日计划：${escapeHtml(e.message)}</div>`}}async function refreshConfirmationReceipt(){
+ const node=document.querySelector("#confirmation-receipt");if(!node)return;
+ node.classList.add("hidden");
+ const receipt=readConfirmationReceipt(sessionStorage,{student,user,date});
+ if(!receipt||session.pendingVerification)return;
+ try{
+  const response=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(receipt.causeId)}/evidence-status`,{headers:{"x-user-id":user}});
+  if(!response.ok)return;
+  const json=await response.json(),status=json.data??json;
+  if(status.state!=="PendingReview"||Number(status.eligible_attempt_count)<1)return;
+  node.replaceChildren();
+  const heading=document.createElement("b");heading.textContent="上次确认练习已保存 · 错因待审查";
+  const detail=document.createElement("p");detail.textContent=`服务器确认已有 ${Number(status.eligible_attempt_count)||0} 条独立作答证据。无需重复作答，继续今日学习即可。`;
+  node.append(heading,detail);node.classList.remove("hidden");
+ }catch{/* A stale or unreachable status never becomes proof of a successful answer. */}
+}
+function stageFromPlan(v){
+ const stage=v?.student?.current_stage||v?.student?.stage||v?.profile?.current_stage;
+ // Preview stage is only user-selected for the demo; real data never assumes the grade.
+ return ["Primary","Middle","High"].includes(stage)?stage:canUseDemoQuestions(student,user)?({"primary":"Primary","middle":"Middle","high":"High"}[q.get("stage")]||"Primary"):null;
+}
+function applyStage(v){
+ const stage=stageFromPlan(v);
+ document.body.dataset.stage=stage||"Unspecified";
+ const greeting=document.querySelector("#greeting"),sub=document.querySelector("#student-subtitle"),art=document.querySelector(".welcome-illustration");
+ const lines={Primary:["今天也要进步一点点","一步一步，轻松完成今日任务","📚"],Middle:["专注当下，稳步提升","跟上进度，巩固每一步","📘"],High:["保持节奏，持续积累","把时间用在今天最重要的学习上","📖"]};
+ const [hello,description,illustration]=lines[stage]||["今天开始，稳步向前","按照自己的节奏完成学习计划","📚"];
+ greeting.textContent=hello;sub.textContent=description;art.textContent=illustration;
+}
+function render(v){
+ session.today=v;applyStage(v);
+ const s=v.summary||{},tasks=Array.isArray(v.tasks)?v.tasks:[],ratio=Math.max(0,Math.min(1,Number(s.progress_ratio)||0)),p=Math.round(ratio*100);
+ document.querySelector("#percent").textContent=p+"%";
+ document.querySelector("#progress-fill").style.width=p+"%";
+ document.querySelector("#done").textContent=Number(s.completed_tasks)||0;
+ document.querySelector("#minutes").textContent=Number.isFinite(Number(s.estimated_total_minutes))?String(Number(s.estimated_total_minutes)):"--";
+ document.querySelector("#pending").textContent=Number(s.pending_tasks)||0;
+ const active=v.current_task,hasTasks=tasks.length>0;
+ document.querySelector("#hero-title").textContent=active?(p>0?"继续今天的学习":"今天的学习已准备好"):hasTasks?"今天的任务完成啦":"今日还没有安排任务";
+ document.querySelector("#hero-copy").textContent=session.pendingCompletion?"上一次任务的完成结果还未确认，请先恢复进度。":active?`下一项：${labels[active.source_type]||"学习任务"} · 约 ${Math.ceil((Number(active.estimated_seconds)||0)/60)} 分钟`:hasTasks?"今天先到这里，保持好自己的学习节奏。":"学习计划准备好后，会出现在这里。";
+ document.querySelector("#hero-duration").textContent=Number.isFinite(Number(s.estimated_total_minutes))?`预计 ${Number(s.estimated_total_minutes)} 分钟`:"今日计划";
+ const primary=document.querySelector("#start");
+ primary.textContent=session.pendingAnswer||session.pendingCompletion||session.pendingVerification?"恢复学习":active?(p>0?"继续今日学习 →":"开始今日学习 →"):"查看今日学习";
+ const goal=document.querySelector("#goal-summary");
+ if(goal)goal.textContent=tasks.length?`今日计划：完成 ${tasks.length} 项学习任务，目前已完成 ${Number(s.completed_tasks)||0} 项。`:"今天暂无已安排的学习任务。";
+ document.querySelector("#tasks").innerHTML=tasks.length?tasks.map((t,i)=>{
+  const kind=String(t.source_type||""),icons={SchoolSync:"▤",Review:"↻",Diagnostic:"◎",Repair:"✦",Expansion:"◇"},descriptions={SchoolSync:"跟随当前教材进度",Review:"回顾已经学过的内容",Diagnostic:"了解当前学习情况",Repair:"有针对性地巩固",Expansion:"拓展已有学习内容"};
+  return `<div class="task ${t.status==="Completed"?"done":""}" data-kind="${escapeHtml(kind)}"><span class="num" aria-hidden="true">${icons[kind]||"•"}</span><main><b>${escapeHtml(labels[kind]||kind||"学习任务")}</b><small>${escapeHtml(descriptions[kind]||"按计划完成本项学习")}</small></main><span class="status">${t.status==="Completed"?"已完成":t.status==="InProgress"?"进行中":"待学习"}</span></div>`;
+ }).join(""):'<div class="empty">今日暂无任务，稍后再来看看。</div>';
+}
+async function loadGrowthSummary(){
+ const growthNode=document.querySelector("#growth-summary"),focusNode=document.querySelector("#focus-summary");
+ if(!student||!user)return;
+ try{
+  const response=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/growth`,{headers:{"x-user-id":user}});
+  const json=await response.json();if(!response.ok)throw new Error("growth unavailable");
+  const growth=json.data??json;
+  const completed=Number(growth.tasks?.completed),seconds=Number(growth.learning?.effective_seconds),sessions=Number(growth.learning?.session_count),due=Number(growth.review?.due_count);
+  if(![completed,seconds,sessions,due].every(Number.isFinite)||[completed,seconds,sessions,due].some(v=>v<0))throw new Error("invalid growth data");
+  const period=growth.period;
+  const range=period?.from&&period?.to?`${period.from} 至 ${period.to}`:"最近 7 天";
+  if(growthNode)growthNode.textContent=`${range}：已完成 ${completed} 项学习任务，记录有效学习 ${Math.floor(seconds/60)} 分钟（${sessions} 次已结束的学习会话）。仅展示记录，不代表成绩提升。`;
+  if(focusNode){
+   const note=focusNode.querySelector("p");
+   if(note)note.textContent=due>0?`目前有 ${due} 项到期复习记录。请根据今日计划依次学习；这不是已确认的薄弱点或错因结论。`:"暂无来自已审核证据的薄弱点结论，按今日计划稳步学习。";
+  }
+ }catch{
+  if(growthNode)growthNode.textContent="最近的学习记录暂时无法读取，稍后可重新打开首页查看。";
+  if(focusNode){const note=focusNode.querySelector("p");if(note)note.textContent="薄弱点数据暂时不可用，不会根据缺失数据生成学习结论。";}
+ }
+}
+function renderDemo(){render({summary:{completed_tasks:1,pending_tasks:2,estimated_total_minutes:20,progress_ratio:.35},current_task:{source_type:"SchoolSync",estimated_seconds:600},tasks:[{source_type:"Review",target_type:"Knowledge",estimated_seconds:300,status:"Completed"},{source_type:"SchoolSync",target_type:"Knowledge",estimated_seconds:600,status:"Pending"},{source_type:"SchoolSync",target_type:"Ability",estimated_seconds:300,status:"Pending"}]});document.querySelector("#hero-copy").textContent="演示模式 · 接入学生账号后会读取真实今日计划。"}function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+const session={today:null,liveQuestion:null,activeQuestion:null,feedback:null,stats:createSessionStats(),pendingAnswer:readPendingAnswer(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user}),pendingCompletion:readPendingCompletion(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user}),pendingVerification:readPendingVerification(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user,date})};let flowState=Flow.HOME;function setFlow(next){flowState=transition(flowState,next);document.querySelector("#player")?.setAttribute("data-flow-state",next)}
+const demoQuestions=[
+ {prompt:"Choose the best answer: My brother ___ football after school.",options:["play","plays","playing","played"],answer:1,explain:"主语 My brother 是第三人称单数。一般现在时中，动词 play 要变成 plays。",repair:"记住一个小判断：先找主语。he / she / it 或单个人名，在一般现在时肯定句里，动词通常要加 -s / -es。"},
+ {prompt:"Which word means “通常；经常”?",options:["usually","never","inside","lovely"],answer:0,explain:"usually 表示“通常；经常”，常用于描述习惯。",repair:"把频率词放进句子记：I usually read after dinner. 先理解意思，再记单词。"}
+];let qi=0,sessionStarted=Date.now();
+function showPlayerNotice(title,message){document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p><button id="back-home">返回今日学习</button></div></div>`;document.querySelector("#back-home").onclick=closePlayer}
+async function openPlayer(){setFlow(Flow.ANSWERING);qi=0;sessionStarted=Date.now();session.stats=createSessionStats();session.liveQuestion=null;session.activeQuestion=null;session.feedback=null;document.querySelector("#player").classList.remove("hidden");if(!canUseDemoQuestions(student,user)){if(session.pendingVerification){showPendingVerificationRecovery();return}if(!student||!user){showPlayerNotice("身份参数不完整","请提供学生与用户身份后再进入真实学习。");return}const recovery=recoveryPriority(session.pendingAnswer,session.pendingCompletion,session.today?.current_task?.task_id);if(recovery==="answer-previous"||recovery==="answer-current"&&session.pendingCompletion){showPendingRecovery();return}if(recovery==="completion"){showCompletionRecovery();return}if(!session.today?.current_task){showPlayerNotice("当前没有可开始的任务","请先检查今日计划，真实账号不会切换到演示题。");return}try{const live=await loadTaskContent(session.today.current_task.task_id);if(!live){showPlayerNotice("学习内容尚未准备好","当前任务没有返回可用的学习题目。");return}session.liveQuestion=live;return showLiveQuestion(live)}catch(e){showPlayerNotice("这项学习内容暂时还没准备好",e.message);return}}showQuestion()}
+function showPendingVerificationRecovery(message="独立确认题的提交结果尚未确认。请恢复原请求，避免重复记录。"){
+ document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><h2>恢复确认练习</h2><p>${escapeHtml(message)}</p><button class="primary-wide" id="retry-verification">重试原确认题答案</button><button id="back-home">返回今日学习</button></div></div>`;
+ document.querySelector("#retry-verification").onclick=replayPendingVerification;
+ document.querySelector("#back-home").onclick=closePlayer;
+}
+async function replayPendingVerification(){
+ const pending=session.pendingVerification;if(!pending)return;
+ const button=document.querySelector("#retry-verification");if(button)button.disabled=true;
+ try{
+  const req=verificationReplayRequest(pending);
+  const response=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(req.causeId)}/question/answer`,{method:"POST",headers:{"content-type":"application/json","x-user-id":user,"idempotency-key":req.key},body:JSON.stringify(req.body)});
+  const json=await response.json();if(!response.ok)throw Error(json?.error?.message||"确认题原请求仍未确认");
+  session.pendingVerification=null;clearPendingVerification(sessionStorage);
+    saveConfirmationReceipt(sessionStorage,{student,user,date},req.causeId);
+  const result=(json.data??json).attempt?.result;
+  showPlayerNotice("确认练习已恢复",`原答案已记录（${result==="Correct"?"答对":result==="Wrong"?"答错":"结果已确认"}）。错因仍待审查，未生成修复任务。`);
+  await load();
+ }catch(e){showPendingVerificationRecovery("提交结果仍未确认："+e.message+"。原请求已保留，请稍后重试。")}
+}
+function showCompletionRecovery(message="上一项任务的完成结果尚未确认。先核对服务器记录，再继续学习。"){document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><h2>恢复学习进度</h2><p>${escapeHtml(message)}</p><button class="primary-wide" id="retry-completion">核对并恢复进度</button><button id="back-home">返回今日学习</button></div></div>`;document.querySelector("#retry-completion").onclick=recoverCompletion;document.querySelector("#back-home").onclick=closePlayer}
+async function recoverCompletion(){if(session.pendingAnswer){showPendingRecovery("上一题作答仍未确认。请先恢复原答案，再核对任务完成状态。");return}const taskId=session.pendingCompletion;if(!taskId)return;const button=document.querySelector("#retry-completion");if(button)button.disabled=true;try{const r=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/today?date=${encodeURIComponent(date)}`,{headers:{"x-user-id":user}}),j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"学习进度读取失败");let today=j.data??j;if(shouldRetryCompletion(today,taskId)){await apiPost(`/api/v1/students/${encodeURIComponent(student)}/daily-tasks/${encodeURIComponent(taskId)}/complete`);const latest=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/today?date=${encodeURIComponent(date)}`,{headers:{"x-user-id":user}}),body=await latest.json();if(!latest.ok)throw new Error(body?.error?.message||"刷新学习进度失败");today=body.data??body}if(!isTaskCompleted(today,taskId))throw new Error("原任务已不在当前计划，暂时无法确认是否完成。请勿重复作答。");session.pendingCompletion=null;clearPendingCompletion(sessionStorage);render(today);showPlayerNotice("学习进度已恢复","原任务完成状态已经核对，可以返回今日学习继续。")}catch(e){showCompletionRecovery("完成状态仍未确认："+e.message+"。记录已保留，可稍后再试。")}}
+function showPendingRecovery(message="上一题提交结果尚未确认。现在的学习任务已经变化，不能把旧答案提交到新任务。"){document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><h2>先确认上一题结果</h2><p>${escapeHtml(message)}</p><button class="primary-wide" id="retry-old-answer">重试上一题原请求</button><button id="discard-old-answer">放弃恢复并继续</button><button id="back-home">返回今日学习</button></div></div>`;document.querySelector("#retry-old-answer").onclick=replayPreviousAnswer;document.querySelector("#discard-old-answer").onclick=()=>{session.pendingAnswer=null;clearPendingAnswer(sessionStorage);closePlayer();load()};document.querySelector("#back-home").onclick=closePlayer}
+async function replayPreviousAnswer(){const pending=session.pendingAnswer;if(!pending)return;const button=document.querySelector("#retry-old-answer");if(button)button.disabled=true;try{const original=pendingReplayRequest(pending);const r=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/tasks/${encodeURIComponent(original.taskId)}/answer`,{method:"POST",headers:{"content-type":"application/json","x-user-id":user,"idempotency-key":original.key},body:JSON.stringify(original.body)});const j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"原作答尚未确认");session.pendingAnswer=null;clearPendingAnswer(sessionStorage);showPlayerNotice("上一题结果已确认","已恢复原提交结果，不会把旧答案当作新题作答。返回今日学习后可继续当前任务。");await load()}catch(e){showPendingRecovery("上一题仍未确认："+e.message+"。你可以稍后重试；放弃恢复不代表服务器没有保存答案。")}}
+function closePlayer(){setFlow(Flow.HOME);document.querySelector("#player").classList.add("hidden")}
+async function loadTaskContent(taskId){const r=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/tasks/${encodeURIComponent(taskId)}/content`,{headers:{"x-user-id":user}}),j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"暂无可学习内容");return j.data??j}
+function showLiveQuestion(view){const x=normalizeQuestion(view);if(!x){document.querySelector("#player").innerHTML='<div class="lesson"><div class="question-card"><h2>这道内容暂不支持当前 Demo 题型</h2><p>内容已经发布，但学生端还没有对应的交互组件。</p><button id="back-home">返回今日学习</button></div></div>';document.querySelector("#back-home").onclick=closePlayer;return}session.activeQuestion=x;renderQuestion(x,true)}
+function renderQuestion(x,isLive=false){const p=document.querySelector("#player"),choice=x.type==="single_choice"||(!x.type&&Array.isArray(x.options)),control=choice?`<div class="options">${x.options.map((o,i)=>`<button class="option" data-i="${i}">${escapeHtml(o)}</button>`).join("")}</div>`:`<div class="options"><input id="text-answer" class="text-answer" placeholder="${escapeHtml(x.placeholder||"输入答案")}" autocomplete="off"><button id="submit-text">提交答案</button></div>`;p.innerHTML=`<div class="lesson"><div class="lesson-top"><button class="back" id="back">← 今日学习</button><span class="micro">${isLive?"今日任务":(qi+1)+" / "+demoQuestions.length}</span></div><div class="question-card"><span class="pill">理解练习</span><h2>${escapeHtml(x.prompt)}</h2><p class="micro">先自己判断，不确定也可以答。错误会变成一次短修复。</p>${control}<div id="answer-feedback"></div></div></div>`;document.querySelector("#back").onclick=closePlayer;if(choice)p.querySelectorAll(".option").forEach(b=>b.onclick=()=>answer(Number(b.dataset.i),x,isLive));else document.querySelector("#submit-text").onclick=()=>answer(document.querySelector("#text-answer").value,x,isLive);if(isLive&&session.pendingAnswer&&shouldKeepPendingAnswer(session.pendingAnswer,session.today?.current_task?.task_id)){p.querySelectorAll(".option").forEach(b=>b.disabled=true);const submit=p.querySelector("#submit-text");if(submit)submit.disabled=true;const pending=session.pendingAnswer;p.querySelector("#answer-feedback").innerHTML='<div class="feedback-box">上一次作答提交结果尚未确认。请继续提交原答案，避免重复计分。<button class="primary-wide" id="retry-answer">重试原答案</button></div>';p.querySelector("#retry-answer").onclick=()=>answer(pending.chosen,x,true)}}
+function showQuestion(){const x=demoQuestions[qi];if(!x)return showComplete();return renderQuestion(x,false)}async function answer(chosen,x=demoQuestions[qi],isLive=false){if(!canSubmitAnswer(flowState))return;setFlow(Flow.FEEDBACK);const buttons=[...document.querySelectorAll(".option")];buttons.forEach(b=>b.disabled=true);let correct=x.type?evaluateAnswer(x,chosen):chosen===x.answer,attempt=null;if(student&&user&&isLive){try{attempt=await recordAttempt(chosen,x);correct=attempt?.result==="Correct";const ep=attempt?.explanation_payload;if(ep){x.explain=ep.text||ep.explanation||x.explain;x.repair=ep.repair||ep.text||x.repair}}catch(e){setFlow(Flow.ANSWERING);document.querySelector("#answer-feedback").innerHTML=`<div class="feedback-box"><b>提交结果尚未确认</b><br>${escapeHtml(e.message)}<p class="micro">请重试同一个答案，系统会使用原提交标识；不要改选其他答案。</p><button class="primary-wide" id="retry-answer">重试原答案</button></div>`;document.querySelector("#retry-answer").onclick=()=>answer(chosen,x,isLive);return}}session.stats=recordAnswer(session.stats,correct);if(x.type==="single_choice"||!x.type)buttons.forEach((b,i)=>{if(!isLive&&i===x.answer)b.classList.add("correct");if(i===Number(chosen)&&!correct)b.classList.add("wrong");if(i===Number(chosen)&&correct)b.classList.add("correct")});const box=document.querySelector("#answer-feedback");if(correct){box.innerHTML=`<div class="feedback-box"><b>答对了</b><br>${escapeHtml(x.explain)}<button class="primary-wide" id="next">继续</button></div>`;document.querySelector("#next").onclick=nextQuestion}else{box.innerHTML=`<div class="feedback-box"><b>这里卡了一下</b><br>${escapeHtml(x.explain)}</div><div class="repair-box"><b>30 秒修复</b><p>${escapeHtml(x.repair)}</p><button class="primary-wide" id="repair">${isLive?"回顾错题解析":"做一道演示练习"}</button></div>`;document.querySelector("#repair").onclick=()=>showRepair(x);if(student&&user&&attempt?.attempt_id)try{await beginRealFeedback(attempt.attempt_id,x)}catch(e){console.warn("real feedback write failed",e)}}}
+function showRepair(x){setFlow(Flow.REPAIRING);if(!demoQuestions.includes(x)){document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><span class="pill">回顾错题</span><h2>${escapeHtml(x.prompt)}</h2><div class="repair-box">${escapeHtml(x.repair||x.explain||"请再回顾这道题的解释。")}</div><p class="micro">当前没有经过审核的独立确认题，不会据此判定掌握或验证错因。</p><button class="primary-wide" id="return-main">返回主线</button></div></div>`;document.querySelector("#return-main").onclick=nextQuestion;if(session.feedback?.hypothesis&&session.feedback.question===x){const action=document.createElement("button");action.className="primary-wide";action.textContent="做一道独立确认练习";document.querySelector(".question-card").appendChild(action);action.onclick=()=>showIndependentVerificationQuestion(x,session.feedback.hypothesis)}return}const vocab=x.prompt?.includes("usually");const check=vocab?{prompt:"Which word means 通常；经常?",options:["never","usually"],correct:1,hint:"usually 表示通常；经常，never 表示从不。"}:{prompt:"一般现在时中，主语是 he / she / it 时，普通动词通常怎样变化？",options:["通常加 -s / -es","永远不变化"],correct:0,hint:"第三人称单数作主语时，一般现在时肯定句中的普通动词通常加 -s / -es。"};document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><span class="pill">演示修复 · 不计入掌握度</span><h2>${escapeHtml(check.prompt)}</h2><div class="options">${check.options.map((s,i)=>`<button class="option" data-repair-index="${i}">${escapeHtml(s)}</button>`).join("")}</div><div id="repair-feedback"></div></div></div>`;document.querySelectorAll("[data-repair-index]").forEach(b=>b.onclick=()=>{const correct=Number(b.dataset.repairIndex)===check.correct;document.querySelector("#repair-feedback").innerHTML=correct?'<div class="feedback-box"><b>这题答对了</b><br>这只是演示练习，不代表错因已经得到验证。<button class="primary-wide" id="return-main">返回主线</button></div>':`<div class="feedback-box">${escapeHtml(check.hint)} 请再试一次。</div>`;if(correct){session.stats=recordRepairPractice(session.stats);document.querySelectorAll("[data-repair-index]").forEach(button=>button.disabled=true);document.querySelector("#return-main").onclick=nextQuestion}})}
+async function finishLiveTask(){if(!(student&&user&&session.today?.current_task))return nextQuestion();if(!canCompleteTask(flowState))return;if(!canBeginTaskCompletion(session.pendingAnswer,session.pendingCompletion)){if(session.pendingAnswer)showPendingRecovery("作答结果尚未确认，不能先提交任务完成。");else showCompletionRecovery();return}setFlow(Flow.COMPLETING);let saved=false;const taskId=session.today.current_task.task_id;session.pendingCompletion=taskId;savePendingCompletion(sessionStorage,{student,user},taskId);try{await apiPost(`/api/v1/students/${encodeURIComponent(student)}/daily-tasks/${encodeURIComponent(taskId)}/complete`);saved=true;session.liveQuestion=null;session.activeQuestion=null;const r=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/today?date=${encodeURIComponent(date)}`,{headers:{"x-user-id":user}}),j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"刷新学习进度失败");const today=j.data??j;if(!isTaskCompleted(today,taskId))throw new Error("任务完成状态尚未同步");session.pendingCompletion=null;clearPendingCompletion(sessionStorage);setFlow(Flow.LOADING_NEXT);render(today);if(today.current_task){const live=await loadTaskContent(today.current_task.task_id);if(!live)throw new Error("下一项没有可用的学习内容");session.liveQuestion=live;setFlow(Flow.ANSWERING);showLiveQuestion(live)}else showComplete()}catch(e){document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><h2>${completionFailureCopy(saved)}</h2><p>${escapeHtml(e.message)}</p><p class="micro">完成状态不确定时会保存恢复记录，不会自动重复提交。</p><button id="back-home">返回今日学习</button></div></div>`;document.querySelector("#back-home").onclick=()=>{closePlayer();load()}}}
+function nextQuestion(){if(student&&user&&session.liveQuestion)return finishLiveTask();qi++;setFlow(Flow.ANSWERING);showQuestion()}
+function showComplete(){setFlow(Flow.TODAY_COMPLETE);const sec=Math.max(1,Math.round((Date.now()-sessionStarted)/1000));document.querySelector("#player").innerHTML=`<div class="lesson success"><div class="check">✓</div><h2>这一小段完成了</h2><p>${escapeHtml(completionMessage(session.stats))}</p><p class="micro">本次体验约 ${sec} 秒 · Demo 不把这当成“成绩提升证明”。</p><button id="finish">回到今日学习</button></div>`;document.querySelector("#finish").onclick=closePlayer}
+async function recordAttempt(chosen,x){const current=session.today?.current_task,contentVersion=x.contentVersion||q.get("contentVersion");if(!current||!contentVersion)throw new Error("当前任务缺少可提交的题目版本");const pending=prepareAnswerSubmission(session.pendingAnswer,{taskId:current.task_id,contentVersion,chosen,answerPayload:x.type?attemptAnswerPayload(x,chosen):{choice:chosen},responseTimeMs:Math.max(1,Date.now()-sessionStarted)},()=>crypto.randomUUID());session.pendingAnswer=pending;savePendingAnswer(sessionStorage,{student,user},pending);const r=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/tasks/${encodeURIComponent(pending.taskId)}/answer`,{method:"POST",headers:{"content-type":"application/json","x-user-id":user,"idempotency-key":pending.key},body:JSON.stringify(pending.body)});const j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"answer failed");session.pendingAnswer=null;clearPendingAnswer(sessionStorage);return j.data??j}
+async function apiPost(path,body={}){const r=await fetch(api+path,{method:"POST",headers:{"content-type":"application/json","x-user-id":user,"idempotency-key":crypto.randomUUID()},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"request failed");return j.data??j}
+async function beginRealFeedback(attemptId,x){const out=await apiPost(`/api/v1/students/${encodeURIComponent(student)}/feedback/attempts/${encodeURIComponent(attemptId)}`),groups=out.feedback??out?.feedback?.feedback??[],hyp=groups.flatMap(g=>g.hypotheses||[])[0];if(!hyp)return;session.feedback={hypothesis:hyp,question:x};/* Cause remains a hypothesis until an approved verification question produces evidence. */}
+async function showIndependentVerificationQuestion(original,hyp){
+ const player=document.querySelector("#player");
+ player.innerHTML='<div class="lesson"><div class="question-card"><h2>正在读取独立确认题…</h2></div></div>';
+ try{
+  const res=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(hyp.error_cause_hypothesis_id)}/question`,{headers:{"x-user-id":user}});
+  const json=await res.json();if(!res.ok)throw new Error(json?.error?.message||"目前没有审核通过的独立确认题");
+  const question=normalizeQuestion({content:(json.data??json).question});
+  if(!question)throw new Error("独立确认题暂不支持此题型");
+  const choice=question.type==="single_choice";
+  player.innerHTML=`<div class="lesson"><div class="question-card"><span class="pill">独立确认练习 · 不直接判定掌握度</span><h2>${escapeHtml(question.prompt)}</h2><p class="micro">答案会提交给服务器判分并保存证据；单次作答不会直接确认错因。</p><div class="options">${choice?question.options.map((v,i)=>`<button class="option" data-v-index="${i}">${escapeHtml(v)}</button>`).join(""):'<input class="text-answer" id="verification-text" placeholder="输入答案"><button id="verification-submit">提交答案</button>'}</div><div id="verification-feedback"></div><button id="verification-return">返回学习主线</button></div></div>`;
+  document.querySelector("#verification-return").onclick=nextQuestion;
+  let pending=null;
+  async function submit(value){
+   if(pending&&pending.value!==value)return;
+   pending??={value,key:crypto.randomUUID()};
+   const body={content_version_id:question.contentVersion,answer_payload:attemptAnswerPayload(question,pending.value)};
+   const recovery={causeId:hyp.error_cause_hypothesis_id,key:pending.key,body};
+   if(session.pendingVerification&&session.pendingVerification.key!==pending.key)return;
+   session.pendingVerification=recovery;
+   savePendingVerification(sessionStorage,{student,user,date},recovery);
+   player.querySelectorAll(".option").forEach(b=>b.disabled=true);
+   const input=player.querySelector("#verification-text");if(input)input.disabled=true;
+   const submitButton=player.querySelector("#verification-submit");if(submitButton)submitButton.disabled=true;
+   try{
+    const response=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(hyp.error_cause_hypothesis_id)}/question/answer`,{method:"POST",headers:{"content-type":"application/json","x-user-id":user,"idempotency-key":pending.key},body:JSON.stringify(body)});
+    const outcome=await response.json();if(!response.ok)throw new Error(outcome?.error?.message||"提交失败");
+    const result=(outcome.data??outcome).attempt?.result;
+    session.pendingVerification=null;clearPendingVerification(sessionStorage);
+    saveConfirmationReceipt(sessionStorage,{student,user,date},hyp.error_cause_hypothesis_id);
+    const feedbackBox=document.querySelector("#verification-feedback");
+    feedbackBox.innerHTML=`<div class="feedback-box"><b>${result==="Correct"?"本题答对了":"本题答错了"}</b><p>这次作答已记录。错因是否成立仍需独立证据规则确认，暂不生成修复任务。</p><div id="cause-evidence-status" aria-live="polite">正在核对证据状态…</div></div>`;
+    try{
+     const statusResponse=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(hyp.error_cause_hypothesis_id)}/evidence-status`,{headers:{"x-user-id":user}});
+     const statusJson=await statusResponse.json();
+     if(!statusResponse.ok)throw new Error(statusJson?.error?.message||"状态查询失败");
+     const status=statusJson.data??statusJson;
+     const node=document.querySelector("#cause-evidence-status");
+     if(node)node.innerHTML=status.state==="PendingReview"
+       ?`<p><b>错因待审查</b> · 已核验 ${Number(status.eligible_attempt_count)||0} 条独立作答证据（答对 ${Number(status.correct_count)||0}，答错 ${Number(status.wrong_count)||0}）。</p><p class="micro">证据已记录，但尚不足以确认具体错因或判定掌握。</p>`
+       :'<p>证据状态待进一步确认。</p>';
+    }catch(statusError){
+     const node=document.querySelector("#cause-evidence-status");
+     if(node)node.textContent="作答已保存，但证据状态暂时无法读取，可返回主线继续学习。";
+    }
+   }catch(e){
+    document.querySelector("#verification-feedback").innerHTML=`<div class="feedback-box">提交结果尚未确认：${escapeHtml(e.message)}<button id="verification-retry">重试原答案</button></div>`;
+    document.querySelector("#verification-retry").onclick=()=>submit(pending.value);
+   }
+  }
+  if(choice)player.querySelectorAll("[data-v-index]").forEach(b=>b.onclick=()=>submit(Number(b.dataset.vIndex)));
+  else document.querySelector("#verification-submit").onclick=()=>submit(document.querySelector("#verification-text").value);
+ }catch(e){player.innerHTML=`<div class="lesson"><div class="question-card"><h2>确认练习暂不可用</h2><p>${escapeHtml(e.message)}</p><button id="return-main">返回学习主线</button></div></div>`;document.querySelector("#return-main").onclick=nextQuestion}
+}
+function showVerification(x,hyp){setFlow(Flow.REPAIRING);document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><span class="pill">确认理解</span><h2>这次错因暂时无法确认</h2><p class="micro">仅凭自我感觉不能确认错误原因。这里先记录为待确认，不会伪造验证证据。</p><div class="options"><button class="option" id="verify-yes">先记录待确认，返回主线</button><button class="option" id="verify-no">暂时还不确定</button></div><div id="repair-feedback"></div></div></div>`;document.querySelector("#verify-yes").onclick=()=>verifyCause(hyp,"Inconclusive",x);document.querySelector("#verify-no").onclick=()=>verifyCause(hyp,"Inconclusive",x)}
+async function verifyCause(hyp,result,x){try{const out=await apiPost(`/api/v1/students/${encodeURIComponent(student)}/feedback/causes/${encodeURIComponent(hyp.error_cause_hypothesis_id)}/verify`,{verification_type:"StudentCheck",result}),planned=out.repair?.task??out.repair?.task?.task??null;if(result!=="Supports"||!planned){document.querySelector("#repair-feedback").innerHTML='<div class="feedback-box">先不强行下结论。回到主线，后续证据再判断。</div><button class="primary-wide" id="return-main">返回主线</button>';document.querySelector("#return-main").onclick=nextQuestion;return}showRealRepair(planned,x)}catch(e){document.querySelector("#repair-feedback").innerHTML=`<div class="feedback-box">修复链暂时没有接通：${escapeHtml(e.message)}</div>`}}
+function showRealRepair(task,x){setFlow(Flow.REPAIRING);document.querySelector("#player").innerHTML=`<div class="lesson"><div class="question-card"><span class="pill">针对性修复</span><h2>把刚才卡住的点再理顺一次</h2><div class="repair-box"><p>${escapeHtml(x.repair)}</p><p class="micro">预计 ${Math.ceil(Number(task.estimated_seconds||180)/60)} 分钟 · 完成后返回主线</p></div><button class="primary-wide" id="repair-complete">我已经完成这次修复</button></div></div>`;document.querySelector("#repair-complete").onclick=()=>completeRealRepair(task)}
+async function completeRealRepair(task){try{await apiPost(`/api/v1/students/${encodeURIComponent(student)}/feedback/repairs/${encodeURIComponent(task.micro_repair_task_id)}/complete`,{plan_date:date});document.querySelector("#player").innerHTML='<div class="lesson success"><div class="check">✓</div><h2>修复完成</h2><p>这次只处理刚才真正卡住的点，现在回到今日主线。</p><button id="return-main">返回主线</button></div>';document.querySelector("#return-main").onclick=finishLiveTask}catch(e){document.querySelector("#player").insertAdjacentHTML("beforeend",`<div class="feedback-box">完成记录失败：${escapeHtml(e.message)}</div>`)}}
+
+document.querySelector("#start").onclick=openPlayer;
+document.querySelectorAll("[data-nav]").forEach(button=>button.onclick=()=>{
+ const destination=button.dataset.nav;
+ if(destination==="study")return openPlayer();
+ if(destination==="growth")return document.querySelector("#growth-heading")?.scrollIntoView({behavior:"smooth",block:"start"});
+ if(destination==="mine")return showPlayerNoticeForNavigation();
+ window.scrollTo({top:0,behavior:"smooth"});
+});
+function showPlayerNoticeForNavigation(){
+ const player=document.querySelector("#player");
+ player.classList.remove("hidden");
+ showPlayerNotice("我的学习空间","个人中心将在正式账号与资料服务接入后开放。现在可以继续今日学习。");
+}
+load();
