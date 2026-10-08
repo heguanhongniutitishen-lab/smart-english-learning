@@ -1,0 +1,30 @@
+name: student-production-smoke
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Public student demo URL"
+        required: true
+        default: "https://smart-english-demo.vercel.app"
+        type: string
+jobs:
+  public-deployment-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate URL is the expected HTTPS demo hostname
+        env:
+          TARGET_URL: ${{ inputs.url }}
+        run: |
+          node --input-type=module -e '
+            const u=new URL(process.env.TARGET_URL);
+            if(u.protocol!=="https:"||u.hostname!=="smart-english-demo.vercel.app"||u.username||u.password||u.port||u.pathname!=="/"||u.search||u.hash)throw new Error("Only the canonical HTTPS student demo URL is allowed");
+          '
+      - name: Check production student assets and recovery code
+        env:
+          TARGET_URL: ${{ inputs.url }}
+        run: node apps/student-web/scripts/verify-deployment.js "$TARGET_URL"
