@@ -77,3 +77,7 @@ A persisted independent verification attempt may belong to only one candidate ca
 ## Read-only cause evidence audit (Sprint 11)
 
 `CauseEvidenceAuditReadModel` and `inspectCauseEvidence` inspect provenance, ownership, original-versus-independent content identity, approved publication, target mapping, duplicate attempt references, technical status, and whether evidence has already been adjudicated. They return `PendingReview`, eligibility counts, and diagnostic reason codes. They **never** translate one correct or wrong answer into a `Supports` or `Contradicts` verdict, alter cause status/mastery, or create repair tasks. No reviewed cause-adjudication policy exists yet. The audit is internal only and is not exposed as a student-facing proof or recommendation.
+
+## Original wrong-answer provenance gate
+
+Read-only cause evidence audit now checks the initiating error observation against its original question attempt: the original attempt must belong to the same student, refer to the observed content version, have technical status `OK`, and actually be graded `Wrong`. A valid independent confirmation cannot make an invalid original observation eligible for cause adjudication. The outcome stays `PendingReview`; this remains an audit-only safeguard, not an automatic cause verdict or repair trigger.
