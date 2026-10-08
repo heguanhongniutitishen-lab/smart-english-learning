@@ -84,6 +84,14 @@ try{
  assert.equal(linkedEvidence.length,1);
  assert.equal(linkedEvidence[0].content_version_id,independent.content_version_id);
  assert.equal(linkedEvidence[0].result,null);
+ const candidate=(await pool.query("SELECT h.error_cause_hypothesis_id FROM error_cause_hypotheses h JOIN error_observations o USING(error_observation_id) WHERE o.student_id=$1 ORDER BY h.created_at LIMIT 1",[wrongFixture.studentId])).rows[0];
+ const statusResponse=await wrongPage.request.get(`http://127.0.0.1:${webPort}/api/v1/students/${wrongFixture.studentId}/feedback/causes/${candidate.error_cause_hypothesis_id}/evidence-status`,{headers:{"x-user-id":wrongFixture.userId}});
+ assert.equal(statusResponse.status(),200);
+ const statusBody=(await statusResponse.json()).data;
+ assert.equal(statusBody.state,"PendingReview");
+ assert.equal(statusBody.eligible_attempt_count,1);
+ assert.equal(statusBody.wrong_count,1);
+ assert.ok(statusBody.reasons.includes("CAUSE_ADJUDICATION_POLICY_NOT_APPROVED"));
 
  let feedbackRows=[];
  for(let i=0;i<40;i++){
