@@ -38,6 +38,27 @@ async function run(){
   }
  }
  console.log("PASS browser: Primary/Middle/High home at 320/390/430px without horizontal overflow");
+ for(const width of [768,1024,1440]){
+  const tabletOrDesktop=await browser.newPage({viewport:{width,height:900}});
+  const errors=[];
+  tabletOrDesktop.on("pageerror",e=>errors.push(e.message));
+  await tabletOrDesktop.goto(`http://127.0.0.1:${port}/?stage=middle`);
+  await tabletOrDesktop.locator("#tasks .task").first().waitFor();
+  const layout=await tabletOrDesktop.evaluate(()=>{
+    const shell=document.querySelector(".shell"),hero=document.querySelector(".hero"),stats=document.querySelector(".stats"),tasks=document.querySelector(".task-section");
+    const heroRect=hero.getBoundingClientRect(),statsRect=stats.getBoundingClientRect();
+    return {pageWidth:document.documentElement.scrollWidth,viewport:innerWidth,shellWidth:shell.getBoundingClientRect().width,gridColumns:getComputedStyle(shell).gridTemplateColumns,heroTop:heroRect.top,statsTop:statsRect.top,heroRight:heroRect.right,statsLeft:statsRect.left,taskVisible:tasks.getBoundingClientRect().width>0};
+  });
+  assert.ok(layout.pageWidth<=layout.viewport+1,`Horizontal overflow at ${width}: ${JSON.stringify(layout)}`);
+  assert.ok(Math.abs(layout.heroTop-layout.statsTop)<2,`Hero and stats are not in the same row at ${width}`);
+  assert.ok(layout.heroRight<=layout.statsLeft+2,`Hero and stats overlap at ${width}`);
+  assert.ok(layout.shellWidth>540,`Web dashboard remained phone-sized at ${width}`);
+  assert.ok(layout.taskVisible);
+  assert.equal(errors.length,0,`Browser errors at ${width}: ${errors.join("; ")}`);
+  await tabletOrDesktop.close();
+ }
+ console.log("PASS browser: tablet/desktop 768/1024/1440px use real two-column layouts");
+
  await page.locator("#start").click();
  await page.getByRole("heading",{name:/My brother/}).waitFor();
  await page.locator(".option").nth(0).click();
