@@ -44,3 +44,58 @@ body[data-stage="High"] .goal-section .quiet-symbol{background:#e9eef5}
 .nav-item{border-radius:12px}.nav-item:focus-visible,.start-button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 @media(max-width:380px){.welcome{min-height:158px}.welcome-art{width:78px;flex-basis:78px}.hero{padding:19px}.stats{gap:7px}.stats article{padding:13px 2px}}
 @media(prefers-reduced-motion:reduce){.progress-fill{transition:none}}
+
+
+/* Adaptive web dashboard: mobile-first, tablet two-column, desktop wide workspace.
+   Changes affect presentation only; answer/confirmation flows remain full-screen. */
+@media (min-width: 720px){
+  body{background:#e8eef8}
+  .shell{width:min(calc(100% - 44px),960px);max-width:960px;min-height:100vh;padding:30px 30px 54px;display:grid;grid-template-columns:minmax(0,1.17fr) minmax(0,1fr);grid-template-areas:
+    "welcome welcome"
+    "warning warning"
+    "hero stats"
+    "receipt receipt"
+    "tasks focus"
+    "tasks growth"
+    "tasks goal"
+    "nav nav";column-gap:22px;row-gap:20px;align-content:start;align-items:start;border-radius:24px 24px 0 0}
+  .welcome{grid-area:welcome;min-height:145px;padding:10px 7px 17px}
+  .identity-warning{grid-area:warning;margin:0}
+  .hero{grid-area:hero;align-self:stretch;display:flex;flex-direction:column;justify-content:center}
+  .hero-progress{margin-top:27px}
+  .start-button{margin-top:auto}
+  .stats{grid-area:stats;margin:0;height:100%;grid-template-columns:1fr;gap:12px}
+  .stats article{flex-direction:row;justify-content:flex-start;padding:13px 16px;gap:14px}
+  .stats article>span:last-child{text-align:left;font-size:12px}
+  .stats b{min-width:30px;font-size:23px}
+  .receipt{grid-area:receipt;margin:0}
+  .task-section{grid-area:tasks}
+  .focus-section{grid-area:focus}
+  .growth-section{grid-area:growth}
+  .goal-section{grid-area:goal}
+  .learning-section{margin:0;min-width:0}
+  .bottom-nav{grid-area:nav;position:static;margin:15px 0 0;border-radius:20px;justify-content:center;gap:clamp(26px,6vw,75px);padding:13px 16px}
+  .nav-item{min-width:75px}
+  .task{padding:17px}
+  .quiet-card{min-height:105px}
+}
+@media(min-width:1100px){
+  .shell{width:min(calc(100% - 80px),1200px);max-width:1200px;padding:36px 52px 62px;grid-template-columns:minmax(0,1.5fr) minmax(330px,1fr);column-gap:34px;row-gap:24px}
+  .welcome{min-height:150px}
+  .welcome h1{font-size:32px}
+  .welcome-art{width:130px;height:130px;flex-basis:130px}
+  .hero{padding:34px 38px}
+  .hero h2{font-size:26px}
+  .stats article{padding:18px 22px}
+  .section-title h3{font-size:20px}
+  .task{padding:20px}
+  .task b{font-size:16px}
+  .task small,.quiet-card p{font-size:14px}
+  .bottom-nav{margin-top:20px}
+}
+@media (min-width:720px) and (max-width:800px){
+  .shell{width:calc(100% - 24px);padding:22px;column-gap:16px}
+  .hero{padding:22px}
+  .hero h2{font-size:20px}
+  .stats article{padding:12px}
+}
