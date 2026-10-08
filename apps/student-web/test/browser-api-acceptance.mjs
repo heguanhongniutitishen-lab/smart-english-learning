@@ -63,6 +63,7 @@ try{
  const independentItem=(await pool.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Published') RETURNING content_id")).rows[0];
  const independent=(await pool.query("INSERT INTO content_versions(content_id,version_no,payload,answer_payload,explanation_payload,review_status,reviewed_by,reviewed_at,published_at) VALUES($1,1,$2,$3,$4,'Approved',$5,now(),now()) RETURNING content_version_id",[independentItem.content_id,{stem:"Tom ___ every day.",options:["walk","walks"]},{correct_index:1},{text:"third person -s"},wrongFixture.userId])).rows[0];
  await pool.query("UPDATE content_items SET current_version_id=$2 WHERE content_id=$1",[independentItem.content_id,independent.content_version_id]);
+ await pool.query("UPDATE content_versions SET published_at=now()-interval '1 day' WHERE content_version_id=$1",[independent.content_version_id]);
  await pool.query("INSERT INTO content_knowledge(content_version_id,knowledge_id,role,weight,purpose,review_status) VALUES($1,$2,'PrimaryTested',1,'Learn','Approved')",[independent.content_version_id,wrongFixture.knowledgeIds[0]]);
  const wrongPage=await browser.newPage();
  const wrongErrors=[];wrongPage.on("pageerror",e=>wrongErrors.push(e.message));
