@@ -69,3 +69,7 @@ The authorized student may now POST `/api/v1/students/:studentId/feedback/causes
 ## Pending confirmation evidence association
 
 The independently graded verification attempt is now linked to its originating cause hypothesis through a nullable-result `error_cause_verifications` Question record. The same attempt cannot be linked to two different hypotheses. A replay reuses the original record. Its `result` stays `NULL`: an answer graded Correct/Wrong is not, by itself, a trusted Supports/Contradicts verdict, and neither the cause state nor MicroRepair eligibility changes here. Subsequent evidence adjudication requires explicit documented rules and tests.
+
+## Evidence replay safety
+
+A persisted independent verification attempt may belong to only one candidate cause. Replaying its original idempotent request returns that original evidence link even after the cause status changes, without adding a second evidence or repair record. Attempting to attach the same answer to a different cause is a conflict. These are evidence-integrity protections, **not** cause adjudication criteria.
