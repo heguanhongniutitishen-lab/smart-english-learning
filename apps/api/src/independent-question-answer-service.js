@@ -6,9 +6,24 @@ export class IndependentQuestionAnswerService{
    SELECT h.error_cause_hypothesis_id,'Question',a.content_version_id,a.attempt_id,NULL
    FROM error_cause_hypotheses h JOIN error_observations o USING(error_observation_id)
    JOIN question_attempts a ON a.attempt_id=$3
+   JOIN content_versions cv ON cv.content_version_id=a.content_version_id
+   JOIN content_items ci ON ci.content_id=cv.content_id
+   JOIN content_versions original ON original.content_version_id=o.content_version_id
    WHERE h.error_cause_hypothesis_id=$1 AND o.student_id=$2 AND a.student_id=$2
+   AND h.status IN ('Candidate','Inconclusive')
    AND a.exposure_type='Verification' AND a.technical_status='OK'
-   AND a.content_version_id<>o.content_version_id
+   AND a.content_version_id<>o.content_version_id AND ci.content_id<>original.content_id
+   AND ci.current_version_id=cv.content_version_id AND ci.status='Published'
+   AND cv.review_status='Approved' AND cv.reviewed_by IS NOT NULL AND cv.published_at IS NOT NULL
+   AND (
+    ((h.rationale->>'target_type')='Knowledge' AND EXISTS(
+      SELECT 1 FROM content_knowledge ck WHERE ck.content_version_id=cv.content_version_id
+      AND ck.knowledge_id=(h.rationale->>'target_id')::uuid AND ck.review_status='Approved' AND ck.role<>'ContextOnly'))
+    OR
+    ((h.rationale->>'target_type')='Ability' AND EXISTS(
+      SELECT 1 FROM content_ability ca WHERE ca.content_version_id=cv.content_version_id
+      AND ca.ability_id=(h.rationale->>'target_id')::uuid))
+   )
    ON CONFLICT (attempt_id) WHERE attempt_id IS NOT NULL DO NOTHING RETURNING error_cause_verification_id`,[causeId,studentId,attempt.attempt_id]);
   const association=(await this.pool.query("SELECT error_cause_hypothesis_id FROM error_cause_verifications WHERE attempt_id=$1",[attempt.attempt_id])).rows[0];
   if(!association||association.error_cause_hypothesis_id!==causeId){const e=new Error("verification attempt cannot be linked to this cause");e.status=409;e.code="VERIFICATION_EVIDENCE_LINK_CONFLICT";throw e}
