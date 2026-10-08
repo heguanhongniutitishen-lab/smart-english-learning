@@ -1,3 +1,4 @@
+import {IndependentQuestionAnswerService} from "../src/independent-question-answer-service.js";import {LearningPostgresRepository} from "../src/repositories/learning-postgres.js";
 import test from "node:test";import assert from "node:assert/strict";import pg from "pg";import {CauseVerificationQuestionReadModel} from "../src/cause-verification-question-read-model.js";
 const it=process.env.TEST_DATABASE_URL?test:test.skip;
 it("returns only a different, published and human-approved question without answer key",async()=>{
@@ -30,5 +31,19 @@ it("returns only a different, published and human-approved question without answ
  assert.equal(await svc.forHypothesis(other.student_id,h.error_cause_hypothesis_id),null);
  const state=(await p.query("SELECT status FROM error_cause_hypotheses WHERE error_cause_hypothesis_id=$1",[h.error_cause_hypothesis_id])).rows[0];
  assert.equal(state.status,"Candidate");
+ const grader=new IndependentQuestionAnswerService(p,svc,new LearningPostgresRepository(p));
+ const body={content_version_id:independent.content_version_id,answer_payload:{choice_index:0}};
+ const key="verify-"+crypto.randomUUID();
+ const graded=await grader.submit(student.student_id,h.error_cause_hypothesis_id,body,key);
+ assert.equal(graded.attempt.result,"Wrong");
+ assert.equal(graded.attempt.exposure_type,"Verification");
+ assert.equal(graded.cause_updated,false);
+ const replay=await grader.submit(student.student_id,h.error_cause_hypothesis_id,body,key);
+ assert.equal(replay.attempt.attempt_id,graded.attempt.attempt_id);
+ await assert.rejects(()=>grader.submit(student.student_id,h.error_cause_hypothesis_id,{...body,answer_payload:{choice_index:1}},key),e=>e.code==="VERIFICATION_REPLAY_CONFLICT");
+ assert.equal(Number((await p.query("SELECT count(*) n FROM question_attempts WHERE student_id=$1 AND request_id=$2",[student.student_id,key])).rows[0].n),1);
+ assert.equal(Number((await p.query("SELECT count(*) n FROM outbox_events WHERE aggregate_id=$1 AND event_type='AttemptRecorded'",[graded.attempt.attempt_id])).rows[0].n),1);
+ assert.equal((await p.query("SELECT status FROM error_cause_hypotheses WHERE error_cause_hypothesis_id=$1",[h.error_cause_hypothesis_id])).rows[0].status,"Candidate");
+ assert.equal(Number((await p.query("SELECT count(*) n FROM micro_repair_tasks WHERE student_id=$1",[student.student_id])).rows[0].n),0);
  }finally{await p.end()}
 });
