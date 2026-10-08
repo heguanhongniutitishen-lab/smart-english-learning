@@ -57,4 +57,37 @@ try{
  assert.equal(eventCount,2);
  assert.deepEqual(errors,[]);
  console.log("PASS authenticated browser API: 2 approved questions -> 2 correct attempts -> 2 completed tasks -> 2 outbox events");
+ // A separate synthetic student verifies the real wrong-answer feedback boundary.
+ const wrongFixture=await seed();
+ const wrongPage=await browser.newPage();
+ const wrongErrors=[];wrongPage.on("pageerror",e=>wrongErrors.push(e.message));
+ await wrongPage.goto(`http://127.0.0.1:${webPort}/?student=${wrongFixture.studentId}&user=${wrongFixture.userId}&date=${date}`);
+ await wrongPage.getByRole("button",{name:"开始今日学习"}).click();
+ await wrongPage.getByRole("heading",{name:"My brother ___ football."}).waitFor();
+ await wrongPage.locator(".option").nth(0).click();
+ await wrongPage.getByText("这里卡了一下").waitFor();
+ await wrongPage.getByRole("button",{name:"回顾错题解析"}).click();
+ await wrongPage.getByText("当前没有经过审核的独立确认题").waitFor();
+ let feedbackRows=[];
+ for(let i=0;i<40;i++){
+  feedbackRows=(await pool.query("SELECT o.observation_type,h.status AS cause_status FROM error_observations o JOIN error_cause_hypotheses h USING(error_observation_id) WHERE o.student_id=$1",[wrongFixture.studentId])).rows;
+  if(feedbackRows.length)break;
+  await new Promise(resolve=>setTimeout(resolve,100));
+ }
+ assert.equal(feedbackRows.length,1,"wrong attempt must create one observation and one candidate hypothesis");
+ assert.equal(feedbackRows[0].observation_type,"WrongAnswer");
+ assert.equal(feedbackRows[0].cause_status,"Candidate");
+ assert.equal(Number((await pool.query("SELECT count(*) AS n FROM micro_repair_tasks WHERE student_id=$1",[wrongFixture.studentId])).rows[0].n),0,"no repair without independently verified error cause");
+ await wrongPage.getByRole("button",{name:"返回主线"}).click();
+ await wrongPage.getByRole("heading",{name:"She ___ to school."}).waitFor();
+ await wrongPage.locator(".option").nth(1).click();
+ await wrongPage.getByText("答对了").waitFor();
+ await wrongPage.getByRole("button",{name:"继续"}).click();
+ await wrongPage.getByRole("heading",{name:"这一小段完成了"}).waitFor();
+ const wrongAttempts=(await pool.query("SELECT result FROM question_attempts WHERE student_id=$1 ORDER BY occurred_at",[wrongFixture.studentId])).rows;
+ assert.deepEqual(wrongAttempts.map(x=>x.result),["Wrong","Correct"]);
+ assert.equal(Number((await pool.query("SELECT count(*) AS n FROM daily_tasks t JOIN daily_plans p USING(daily_plan_id) WHERE p.student_id=$1 AND t.status='Completed'",[wrongFixture.studentId])).rows[0].n),2);
+ assert.deepEqual(wrongErrors,[]);
+ console.log("PASS real wrong answer: WrongAnswer observation -> Candidate hypothesis -> no unverified repair -> return to mainline");
+
 }finally{await browser?.close();for(const child of children)child.kill("SIGTERM");await pool.end()}
