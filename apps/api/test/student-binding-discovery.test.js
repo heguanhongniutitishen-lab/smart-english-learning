@@ -12,7 +12,7 @@ test("signed binding discovery excludes other users and inactive students",async
  const disabled=store.createStudent(alice.user_id,{display_name:"B",current_stage:"Middle",current_grade:7});
  store.students.get(disabled.student_id).status="Inactive";
  store.createStudent(bob.user_id,{display_name:"Other",current_stage:"High",current_grade:11});
- const handler=createHandler(store,undefined,null,null,null,null,null,null,null,null,null,null,null,{mode:"signed",secret});
+ const handler=createHandler(store,undefined,null,null,null,null,null,null,null,null,null,null,{mode:"signed",secret});
  const a=await request(handler,issueStudentToken(alice.user_id,secret),{"x-user-id":bob.user_id});
  assert.equal(a.status,200);
  const entries=a.body.data.students;
@@ -25,7 +25,7 @@ test("signed binding discovery excludes other users and inactive students",async
  assert.equal(rejected.status,401);
 });
 test("development identity mode cannot enumerate bindings",async()=>{
- const handler=createHandler(new MemoryStore(),undefined,null,null,null,null,null,null,null,null,null,null,null,{mode:"development"});
+ const handler=createHandler(new MemoryStore(),undefined,null,null,null,null,null,null,null,null,null,null,{mode:"development"});
  const r=await request(handler,"",{"x-user-id":"someone"});
  assert.equal(r.status,403);
 });
