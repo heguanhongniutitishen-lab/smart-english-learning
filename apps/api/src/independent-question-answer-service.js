@@ -2,6 +2,18 @@ function normalized(v){return String(v??"").trim().toLocaleLowerCase("en-US").re
 export class IndependentQuestionAnswerService{
  constructor(pool,readModel,learningRepo){this.pool=pool;this.readModel=readModel;this.learningRepo=learningRepo}
  async linkEvidence(studentId,causeId,attempt){
+  // A confirmed original link is immutable even if the cause later changes state
+  // or the approved content is replaced. Never reattach to another cause.
+  const existing=(await this.pool.query(`SELECT v.error_cause_hypothesis_id FROM error_cause_verifications v
+    JOIN error_cause_hypotheses h USING(error_cause_hypothesis_id)
+    JOIN error_observations o USING(error_observation_id)
+    JOIN question_attempts a ON a.attempt_id=v.attempt_id
+    WHERE v.attempt_id=$1 AND o.student_id=$2 AND a.student_id=$2
+    AND a.exposure_type='Verification' AND a.technical_status='OK'`,[attempt.attempt_id,studentId])).rows[0];
+  if(existing){
+   if(existing.error_cause_hypothesis_id===causeId)return existing;
+   const e=new Error("verification attempt already linked to another cause");e.status=409;e.code="VERIFICATION_EVIDENCE_LINK_CONFLICT";throw e;
+  }
   const inserted=await this.pool.query(`INSERT INTO error_cause_verifications(error_cause_hypothesis_id,verification_type,content_version_id,attempt_id,result)
    SELECT h.error_cause_hypothesis_id,'Question',a.content_version_id,a.attempt_id,NULL
    FROM error_cause_hypotheses h JOIN error_observations o USING(error_observation_id)
