@@ -26,3 +26,18 @@ test("miniapp does not claim playable learning before verified auth/recovery",()
  assert.doesNotMatch(page,/mastery.*\d+%/i);
  assert.match(page,/startLearning\(\)/);
 });
+
+test("native WeChat authentication uses server code exchange and never client openid",()=>{
+ const app=read("app.js");
+ const home=read("pages/home/index.js");
+ const markup=read("pages/home/index.wxml");
+ assert.match(app,/wx\.login\(/);
+ assert.match(app,/\/api\/v1\/auth\/wechat\/code-exchange/);
+ assert.match(app,/expiresAt/);
+ assert.match(app,/studentId:null/);
+ assert.doesNotMatch(app,/x-user-id|open_id\s*:/);
+ assert.match(markup,/bindtap="login"/);
+ assert.match(home,/loginWithWechat\(\)/);
+ assert.match(home,/Date\.now\(\)>=auth\.expiresAt/);
+ assert.match(home,/canStart:false/);
+});
