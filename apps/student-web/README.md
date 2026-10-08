@@ -85,3 +85,7 @@ Read-only cause evidence audit now checks the initiating error observation again
 ## Student-scoped evidence status (read only)
 
 `GET /api/v1/students/:studentId/feedback/causes/:hypothesisId/evidence-status` exposes only `PendingReview`, eligible-answer counts, correct/wrong counts and reason codes to the bound student. It omits private rationale, answer keys, original attempt details and internal hypothesis confidence. It does **not** adjudicate causes, update mastery or generate repairs. This is a status readout, not an approved cause-verdict algorithm. The endpoint has an authorization unit test and a real API + Chromium acceptance assertion.
+
+## Student-facing pending evidence status
+
+After a successful independent confirmation answer, the real student UI reads the student-scoped evidence status endpoint and displays the server-confirmed count of eligible answers, correct/wrong counts, and an explicit `错因待审查` message. It never says the cause is verified or mastery has been achieved. If this secondary status query fails, the answer remains recorded and the learner can return to the mainline. Chromium acceptance asserts the actual on-screen pending status. No repair is automatically planned.
