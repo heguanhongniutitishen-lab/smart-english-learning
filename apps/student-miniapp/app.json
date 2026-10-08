@@ -1,0 +1,11 @@
+{
+  "pages": [
+    "pages/home/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "今日学习",
+    "navigationBarBackgroundColor": "#f5f8ff",
+    "navigationBarTextStyle": "black"
+  },
+  "style": "v2"
+}
