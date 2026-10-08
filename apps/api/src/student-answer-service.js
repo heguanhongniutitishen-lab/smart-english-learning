@@ -9,6 +9,9 @@ export class StudentAnswerService{
   const key=q.rows[0].answer_payload||{},ans=input.answer_payload||{};let correct=false;
   if(Number.isInteger(key.correct_index)&&Number.isInteger(ans.choice_index))correct=key.correct_index===ans.choice_index;
   else{const accepted=Array.isArray(key.accepted_answers)?key.accepted_answers:(typeof key.answer==="string"?[key.answer]:[]);if(accepted.length&&typeof ans.answer==="string")correct=accepted.map(norm).includes(norm(ans.answer));else{const e=new Error("unsupported answer contract");e.status=422;e.code="STUDENT_ANSWER_UNSUPPORTED";throw e}}
-  const attempt=await this.learningRepo.createAttempt(studentId,{...input,result:correct?"Correct":"Wrong",request_id:requestId});return{...attempt,explanation_payload:q.rows[0].explanation_payload??null};
+  const attempt=await this.learningRepo.createAttempt(studentId,{...input,result:correct?"Correct":"Wrong",request_id:requestId});
+  const validation=await this.pool.query("SELECT answer_payload=$2::jsonb AS same_answer FROM question_attempts WHERE attempt_id=$1",[attempt.attempt_id,input.answer_payload]);
+  if(attempt.daily_task_id!==input.daily_task_id||attempt.content_version_id!==input.content_version_id||!validation.rows[0]?.same_answer){const e=new Error("idempotency key already used for a different answer");e.status=409;e.code="STUDENT_ANSWER_IDEMPOTENCY_CONFLICT";throw e}
+  return{...attempt,explanation_payload:q.rows[0].explanation_payload??null};
  }
 }
