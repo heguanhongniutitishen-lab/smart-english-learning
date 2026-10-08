@@ -39,6 +39,23 @@ jobs:
   student-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sel
+          POSTGRES_PASSWORD: sel
+          POSTGRES_DB: sel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U sel -d sel_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://sel:sel@localhost:5432/sel_test
+      TEST_DATABASE_URL: postgresql://sel:sel@localhost:5432/sel_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,5 +66,9 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
+      - name: Prepare browser acceptance database
+        run: node apps/api/scripts/migrate.js
       - name: Exercise student demo in Chromium
         run: node apps/student-web/test/browser-acceptance.mjs
+      - name: Exercise authenticated student API flow in Chromium
+        run: node apps/student-web/test/browser-api-acceptance.mjs
