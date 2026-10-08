@@ -49,3 +49,7 @@ The branch contains `.github/workflows/student-production-smoke.yml` to run the 
 ## Browser acceptance (Chromium)
 
 Sprint 11 PR CI additionally runs `apps/student-web/test/browser-acceptance.mjs` in headless Chromium. It exercises the actual Grade 5 demo controls, wrong-answer explanation, demo repair, correct answer, completion summary, and all-correct scenario. This browser check is distinct from unit tests and static asset checks. It does not exercise authenticated production students or a live API, which still need separate end-to-end verification.
+
+## Authenticated API browser acceptance
+
+The Sprint 11 CI browser job now starts PostgreSQL 16 and the real API, inserts isolated synthetic users, student binding, an active plan and two human-approved published question versions, and drives Chromium through both tasks. It asserts precisely two persisted Correct attempts, two completed daily tasks, and two AttemptRecorded outbox records. No real student records or external API are used. The fixture does not prove production login, deployment, or adaptive mistake repair; those remain separate release gates.
