@@ -1,3 +1,4 @@
+import {CauseEvidenceAuditReadModel} from "../src/cause-evidence-audit.js";
 import {IndependentQuestionAnswerService} from "../src/independent-question-answer-service.js";import {LearningPostgresRepository} from "../src/repositories/learning-postgres.js";
 import test from "node:test";import assert from "node:assert/strict";import pg from "pg";import {CauseVerificationQuestionReadModel} from "../src/cause-verification-question-read-model.js";
 const it=process.env.TEST_DATABASE_URL?test:test.skip;
@@ -46,6 +47,13 @@ it("returns only a different, published and human-approved question without answ
  assert.equal(evidence[0].content_version_id,independent.content_version_id);
  assert.equal(evidence[0].verification_type,"Question");
  assert.equal(evidence[0].result,null);
+ const report=await new CauseEvidenceAuditReadModel(p).forCause(student.student_id,h.error_cause_hypothesis_id);
+ assert.equal(report.state,"PendingReview");
+ assert.equal(report.cause_status,"Candidate");
+ assert.equal(report.eligible_attempt_count,1);
+ assert.equal(report.wrong_count,1);
+ assert.ok(report.reasons.includes("CAUSE_ADJUDICATION_POLICY_NOT_APPROVED"));
+ assert.equal(await new CauseEvidenceAuditReadModel(p).forCause(other.student_id,h.error_cause_hypothesis_id),null);
  const unrelated=(await p.query("INSERT INTO knowledge_points(level,domain,code,name) VALUES(1,'Grammar',$1,'unrelated knowledge') RETURNING knowledge_id",["VQ-UNRELATED-"+crypto.randomUUID()])).rows[0];
  const foreignItem=(await p.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Published') RETURNING content_id")).rows[0];
  const foreignVersion=(await p.query("INSERT INTO content_versions(content_id,version_no,payload,answer_payload,review_status,reviewed_by,reviewed_at,published_at) VALUES($1,1,$2,$3,'Approved',$4,now(),now()) RETURNING content_version_id",[foreignItem.content_id,{stem:"unrelated",options:["a","b"]},{correct_index:1},reviewer.user_id])).rows[0];
