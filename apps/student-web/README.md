@@ -45,3 +45,7 @@ To independently inspect the actual production commit, open Vercel → smart-eng
 ## Independent GitHub Actions deployment smoke
 
 The branch contains `.github/workflows/student-production-smoke.yml` to run the same public asset verification from a GitHub-hosted runner. GitHub only exposes `workflow_dispatch` workflows in the Actions UI when the workflow file also exists on the repository default branch. Since Sprint 11 is an unmerged draft PR, **do not claim the manual workflow is runnable in the UI yet**. It remains prepared for after approved integration. Local verification using the command above works independently and needs no merge.
+
+## Browser acceptance (Chromium)
+
+Sprint 11 PR CI additionally runs `apps/student-web/test/browser-acceptance.mjs` in headless Chromium. It exercises the actual Grade 5 demo controls, wrong-answer explanation, demo repair, correct answer, completion summary, and all-correct scenario. This browser check is distinct from unit tests and static asset checks. It does not exercise authenticated production students or a live API, which still need separate end-to-end verification.
