@@ -90,7 +90,7 @@ try{
  assert.equal(feedbackRows[0].observation_type,"WrongAnswer");
  assert.equal(feedbackRows[0].cause_status,"Candidate");
  assert.equal(Number((await pool.query("SELECT count(*) AS n FROM micro_repair_tasks WHERE student_id=$1",[wrongFixture.studentId])).rows[0].n),0,"no repair without independently verified error cause");
- await wrongPage.getByRole("button",{name:"返回主线"}).click();
+ await wrongPage.getByRole("button",{name:"返回学习主线"}).click();
  await wrongPage.getByRole("heading",{name:"She ___ to school."}).waitFor();
  await wrongPage.locator(".option").nth(1).click();
  await wrongPage.getByText("答对了").waitFor();
