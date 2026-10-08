@@ -41,3 +41,7 @@ npm run verify:deployment --workspace=@sel/student-web -- https://smart-english-
 This checks the public home page, CSS and JavaScript module URLs and tests for the latest recovery-flow code markers. A PASS confirms these public static assets can be read; it does not prove a specific Git commit was deployed or that production API/student authentication works. A FAIL may indicate access restrictions, connectivity, or stale deployment. CI itself does not perform this production check.
 
 To independently inspect the actual production commit, open Vercel → smart-english-demo → Deployments → current Production deployment and compare its branch/commit with the Sprint 11 GitHub HEAD.
+
+## Independent GitHub Actions deployment smoke
+
+The branch contains `.github/workflows/student-production-smoke.yml` to run the same public asset verification from a GitHub-hosted runner. GitHub only exposes `workflow_dispatch` workflows in the Actions UI when the workflow file also exists on the repository default branch. Since Sprint 11 is an unmerged draft PR, **do not claim the manual workflow is runnable in the UI yet**. It remains prepared for after approved integration. Local verification using the command above works independently and needs no merge.
