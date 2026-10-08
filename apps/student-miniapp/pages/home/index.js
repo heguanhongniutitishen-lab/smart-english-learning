@@ -20,6 +20,18 @@ Page({
   }catch(e){this.setData({error:e?.message||"登录未完成"});}
   finally{this.setData({loggingIn:false});}
  },
+ async switchStudent(){
+  const app=getApp(),auth=app.globalData.auth,base=app.globalData.apiBase;
+  if(!auth?.token||Date.now()>=auth.expiresAt){this.setData({error:"身份已过期，请重新登录"});return;}
+  try{
+   const result=await new Promise((resolve,reject)=>wx.request({url:(base.endsWith("/")?base.slice(0,-1):base)+"/api/v1/students/me/bindings",header:{Authorization:"Bearer "+auth.token},success:r=>r.statusCode>=200&&r.statusCode<300?resolve(r.data?.data??r.data):reject(Error("无法重新验证绑定关系")),fail:()=>reject(Error("绑定查询失败"))}));
+   if(!Array.isArray(result?.students))throw Error("绑定名单无效");
+   const list=result.students.filter(s=>typeof s.student_id==="string"&&["Primary","Middle","High"].includes(s.current_stage)).map(s=>({student_id:s.student_id,display_name:String(s.display_name||"学生"),current_stage:s.current_stage}));
+   if(!list.length)throw Error("当前账号没有有效学生绑定");
+   // Switching always requires a fresh authorized roster, never stale local IDs.
+   this.setData({boundStudents:list,error:"请选择学生账号"});
+  }catch(e){this.setData({error:e.message});}
+ },
  async chooseStudent(event){
   const id=event.currentTarget.dataset.studentId;
   const selected=this.data.boundStudents.find(s=>s.student_id===id);
