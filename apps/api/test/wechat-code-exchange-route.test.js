@@ -11,7 +11,13 @@ async function invoke(handler,path,method="POST",body={},headers={}){
 }
 test("real HTTP handler exchanges provider code then accepts its bearer and ignores a spoofed header",async()=>{
  const store=new MemoryStore();let count=0;
- const options={mode:"signed",secret,wechatAppId:"app",wechatAppSecret:"secret",wechatFetch:async()=>{count++;return{ok:true,async json(){return{openid:"trusted-wx-subject",session_key:"secret-from-wechat"}}}}}};
+ const options={
+  mode:"signed",secret,wechatAppId:"app",wechatAppSecret:"secret",
+  wechatFetch:async()=>{
+   count++;
+   return{ok:true,json:async()=>({openid:"trusted-wx-subject",session_key:"secret-from-wechat"})};
+  }
+ };
  const handler=createHandler(store,new IdempotencyStore(),null,null,null,null,null,null,null,null,null,null,null,options);
  const login=await invoke(handler,"/api/v1/auth/wechat/code-exchange","POST",{code:"validCode123",open_id:"attacker"});
  assert.equal(login.statusCode,200);assert.equal(count,1);
