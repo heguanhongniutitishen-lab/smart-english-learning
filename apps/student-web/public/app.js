@@ -6,7 +6,7 @@ import {prepareAnswerSubmission,shouldKeepPendingAnswer,savePendingAnswer,readPe
 import {createSessionStats,recordAnswer,recordRepairPractice,completionMessage} from "./session-summary.js";
 import {normalizeQuestion,evaluateAnswer,attemptAnswerPayload} from "./question-renderers.js";
 import {Flow,transition,canSubmitAnswer,canCompleteTask,canUseDemoQuestions,completionFailureCopy} from "./flow-state.js";
-const q=new URLSearchParams(location.search),student=q.get("student"),user=q.get("user"),api=q.get("api")||"",date=q.get("date")||new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Shanghai"}).format(new Date());document.querySelector("#date").textContent=date;if(student&&user)document.querySelector("#development-identity-warning")?.classList.remove("hidden");const labels={SchoolSync:"跟校巩固",Review:"复习",Diagnostic:"诊断",Repair:"错题修复",Expansion:"拓展"};async function load(){if(!student||!user){if(canUseDemoQuestions(student,user)){renderDemo();return}document.querySelector("#tasks").innerHTML='<div class="empty">学生和用户身份参数需要同时提供，无法进入真实学习。</div>';return}try{const r=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/today?date=${date}`,{headers:{"x-user-id":user}}),j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"读取失败");render(j.data??j);await refreshConfirmationReceipt()}catch(e){document.querySelector("#tasks").innerHTML=`<div class="empty">暂时没有读到今日计划：${escapeHtml(e.message)}</div>`}}async function refreshConfirmationReceipt(){
+const q=new URLSearchParams(location.search),student=q.get("student"),user=q.get("user"),api=q.get("api")||"",date=q.get("date")||new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Shanghai"}).format(new Date());document.querySelector("#date").textContent=date;if(student&&user)document.querySelector("#development-identity-warning")?.classList.remove("hidden");const labels={SchoolSync:"跟校巩固",Review:"复习",Diagnostic:"诊断",Repair:"错题修复",Expansion:"拓展"};async function load(){if(!student||!user){if(canUseDemoQuestions(student,user)){renderDemo();return}document.querySelector("#tasks").innerHTML='<div class="empty">学生和用户身份参数需要同时提供，无法进入真实学习。</div>';return}try{const r=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/active-learning/today?date=${date}`,{headers:{"x-user-id":user}}),j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"读取失败");render(j.data??j);await Promise.allSettled([refreshConfirmationReceipt(),loadGrowthSummary()])}catch(e){document.querySelector("#tasks").innerHTML=`<div class="empty">暂时没有读到今日计划：${escapeHtml(e.message)}</div>`}}async function refreshConfirmationReceipt(){
  const node=document.querySelector("#confirmation-receipt");if(!node)return;
  node.classList.add("hidden");
  const receipt=readConfirmationReceipt(sessionStorage,{student,user,date});
@@ -49,10 +49,33 @@ function render(v){
  document.querySelector("#hero-duration").textContent=Number.isFinite(Number(s.estimated_total_minutes))?`预计 ${Number(s.estimated_total_minutes)} 分钟`:"今日计划";
  const primary=document.querySelector("#start");
  primary.textContent=session.pendingAnswer||session.pendingCompletion||session.pendingVerification?"恢复学习":active?(p>0?"继续今日学习 →":"开始今日学习 →"):"查看今日学习";
+ const goal=document.querySelector("#goal-summary");
+ if(goal)goal.textContent=tasks.length?`今日计划：完成 ${tasks.length} 项学习任务，目前已完成 ${Number(s.completed_tasks)||0} 项。`:"今天暂无已安排的学习任务。";
  document.querySelector("#tasks").innerHTML=tasks.length?tasks.map((t,i)=>{
   const kind=String(t.source_type||""),icons={SchoolSync:"▤",Review:"↻",Diagnostic:"◎",Repair:"✦",Expansion:"◇"},descriptions={SchoolSync:"跟随当前教材进度",Review:"回顾已经学过的内容",Diagnostic:"了解当前学习情况",Repair:"有针对性地巩固",Expansion:"拓展已有学习内容"};
   return `<div class="task ${t.status==="Completed"?"done":""}" data-kind="${escapeHtml(kind)}"><span class="num" aria-hidden="true">${icons[kind]||"•"}</span><main><b>${escapeHtml(labels[kind]||kind||"学习任务")}</b><small>${escapeHtml(descriptions[kind]||"按计划完成本项学习")}</small></main><span class="status">${t.status==="Completed"?"已完成":t.status==="InProgress"?"进行中":"待学习"}</span></div>`;
  }).join(""):'<div class="empty">今日暂无任务，稍后再来看看。</div>';
+}
+async function loadGrowthSummary(){
+ const growthNode=document.querySelector("#growth-summary"),focusNode=document.querySelector("#focus-summary");
+ if(!student||!user)return;
+ try{
+  const response=await fetch(`${api}/api/v1/students/${encodeURIComponent(student)}/growth`,{headers:{"x-user-id":user}});
+  const json=await response.json();if(!response.ok)throw new Error("growth unavailable");
+  const growth=json.data??json;
+  const completed=Number(growth.tasks?.completed),seconds=Number(growth.learning?.effective_seconds),sessions=Number(growth.learning?.session_count),due=Number(growth.review?.due_count);
+  if(![completed,seconds,sessions,due].every(Number.isFinite)||[completed,seconds,sessions,due].some(v=>v<0))throw new Error("invalid growth data");
+  const period=growth.period;
+  const range=period?.from&&period?.to?`${period.from} 至 ${period.to}`:"最近 7 天";
+  if(growthNode)growthNode.textContent=`${range}：已完成 ${completed} 项学习任务，记录有效学习 ${Math.floor(seconds/60)} 分钟（${sessions} 次已结束的学习会话）。仅展示记录，不代表成绩提升。`;
+  if(focusNode){
+   const note=focusNode.querySelector("p");
+   if(note)note.textContent=due>0?`目前有 ${due} 项到期复习记录。请根据今日计划依次学习；这不是已确认的薄弱点或错因结论。`:"暂无来自已审核证据的薄弱点结论，按今日计划稳步学习。";
+  }
+ }catch{
+  if(growthNode)growthNode.textContent="最近的学习记录暂时无法读取，稍后可重新打开首页查看。";
+  if(focusNode){const note=focusNode.querySelector("p");if(note)note.textContent="薄弱点数据暂时不可用，不会根据缺失数据生成学习结论。";}
+ }
 }
 function renderDemo(){render({summary:{completed_tasks:1,pending_tasks:2,estimated_total_minutes:20,progress_ratio:.35},current_task:{source_type:"SchoolSync",estimated_seconds:600},tasks:[{source_type:"Review",target_type:"Knowledge",estimated_seconds:300,status:"Completed"},{source_type:"SchoolSync",target_type:"Knowledge",estimated_seconds:600,status:"Pending"},{source_type:"SchoolSync",target_type:"Ability",estimated_seconds:300,status:"Pending"}]});document.querySelector("#hero-copy").textContent="演示模式 · 接入学生账号后会读取真实今日计划。"}function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 const session={today:null,liveQuestion:null,activeQuestion:null,feedback:null,stats:createSessionStats(),pendingAnswer:readPendingAnswer(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user}),pendingCompletion:readPendingCompletion(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user}),pendingVerification:readPendingVerification(typeof sessionStorage==="undefined"?null:sessionStorage,{student,user,date})};let flowState=Flow.HOME;function setFlow(next){flowState=transition(flowState,next);document.querySelector("#player")?.setAttribute("data-flow-state",next)}
