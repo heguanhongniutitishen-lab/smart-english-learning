@@ -80,6 +80,11 @@ try{
  await wrongPage.getByText("这次作答已记录").waitFor();
  const graded=(await pool.query("SELECT result,exposure_type,content_version_id FROM question_attempts WHERE student_id=$1 AND exposure_type='Verification'",[wrongFixture.studentId])).rows;
  assert.equal(graded.length,1);assert.equal(graded[0].result,"Wrong");assert.equal(graded[0].content_version_id,independent.content_version_id);
+ const linkedEvidence=(await pool.query("SELECT v.result,v.content_version_id,v.attempt_id FROM error_cause_verifications v JOIN question_attempts a ON a.attempt_id=v.attempt_id WHERE a.student_id=$1 AND a.exposure_type='Verification'",[wrongFixture.studentId])).rows;
+ assert.equal(linkedEvidence.length,1);
+ assert.equal(linkedEvidence[0].content_version_id,independent.content_version_id);
+ assert.equal(linkedEvidence[0].result,null);
+
  let feedbackRows=[];
  for(let i=0;i<40;i++){
   feedbackRows=(await pool.query("SELECT o.observation_type,h.status AS cause_status FROM error_observations o JOIN error_cause_hypotheses h USING(error_observation_id) WHERE o.student_id=$1",[wrongFixture.studentId])).rows;
