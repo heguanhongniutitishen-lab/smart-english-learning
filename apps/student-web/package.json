@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node server.js",
     "check": "node --check server.js && node --check public/app.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "verify:deployment": "node scripts/verify-deployment.js"
   },
   "engines": {
     "node": ">=20"
