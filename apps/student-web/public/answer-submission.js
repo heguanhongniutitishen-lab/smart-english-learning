@@ -23,3 +23,6 @@ export function readPendingAnswer(storage,identity,now=Date.now()){
  }catch{try{storage.removeItem(STORAGE_KEY)}catch{}return null}
 }
 export function clearPendingAnswer(storage){try{storage?.removeItem(STORAGE_KEY)}catch{}}
+
+export function pendingTaskChanged(pending,currentTaskId){return Boolean(pending&&pending.taskId!==currentTaskId)}
+export function pendingReplayRequest(pending){if(!pending?.taskId||!pending?.key||!pending?.body)throw new Error("missing pending answer");return{taskId:pending.taskId,key:pending.key,body:pending.body}}
