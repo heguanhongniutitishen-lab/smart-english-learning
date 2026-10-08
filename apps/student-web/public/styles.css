@@ -99,3 +99,7 @@ body[data-stage="High"] .goal-section .quiet-symbol{background:#e9eef5}
   .hero h2{font-size:20px}
   .stats article{padding:12px}
 }
+
+/* The 320–380px shell uses 12px gutters, not the default 18px gutters.
+   Match the sticky navigation bleed to the actual shell padding. */
+@media(max-width:380px){.bottom-nav{margin-left:-12px;margin-right:-12px}}
