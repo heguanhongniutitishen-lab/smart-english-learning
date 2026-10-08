@@ -13,7 +13,7 @@ export class CauseVerificationQuestionReadModel {
    `EXISTS(SELECT 1 FROM content_ability ca WHERE ca.content_version_id=cv.content_version_id AND ca.ability_id=$2)`;
   const row=(await this.pool.query(`SELECT cv.content_version_id,cv.payload,ci.content_type
     FROM content_versions cv JOIN content_items ci ON ci.content_id=cv.content_id
-    WHERE cv.content_version_id<>$1 AND ci.current_version_id=cv.content_version_id
+    WHERE cv.content_version_id<>$1 AND ci.content_id<>(SELECT original.content_id FROM content_versions original WHERE original.content_version_id=$1) AND ci.current_version_id=cv.content_version_id
     AND ci.status='Published' AND cv.review_status='Approved' AND cv.reviewed_by IS NOT NULL
     AND cv.published_at IS NOT NULL AND ${relation}
     AND (jsonb_typeof(cv.payload->'options')='array' OR cv.payload->>'input_type'='text' OR cv.payload->>'response_type'='text')
