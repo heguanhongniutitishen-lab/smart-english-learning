@@ -7,9 +7,19 @@ Page({
  async login(){
   this.setData({loggingIn:true,error:""});
   try{
-   await getApp().loginWithWechat();
-   // A valid user token alone does not establish which student may be read.
-   this.setData({error:"微信身份已验证。还需通过服务端读取该账号绑定的学生，当前不会访问任何未确认的学生数据。"});
+   const auth=await getApp().loginWithWechat();
+   const base=getApp().globalData.apiBase;
+   const result=await new Promise((resolve,reject)=>wx.request({url:base.replace(/\\/$/,"")+"/api/v1/students/me/bindings",header:{Authorization:"Bearer "+auth.token},success:r=>r.statusCode>=200&&r.statusCode<300?resolve(r.data?.data??r.data):reject(Error("无法验证学生绑定关系")),fail:()=>reject(Error("学生绑定查询失败"))}));
+   const students=result?.students;
+   if(!Array.isArray(students))throw Error("绑定查询响应无效");
+   if(students.length!==1){
+    this.setData({error:students.length?"此账号绑定多个学生，需完成学生选择功能后才能进入学习。":"当前微信账号尚未绑定有效学生，请联系管理员。"});
+    return;
+   }
+   const selected=students[0];
+   if(typeof selected.student_id!=="string"||!["Primary","Middle","High"].includes(selected.current_stage))throw Error("学生绑定资料不完整");
+   getApp().globalData.auth={...auth,studentId:selected.student_id,stage:selected.current_stage};
+   await this.load();
   }catch(e){this.setData({error:e?.message||"登录未完成"});}
   finally{this.setData({loggingIn:false});}
  },
