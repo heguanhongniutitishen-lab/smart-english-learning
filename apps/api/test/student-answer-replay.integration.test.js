@@ -25,6 +25,8 @@ it("replays the same persisted answer after its task is no longer Pending, rejec
  assert.equal(conflicting.filter(x=>x.status==="rejected"&&x.reason?.code==="STUDENT_ANSWER_IDEMPOTENCY_CONFLICT").length,1);
  const conflictingAttempts=await pool.query("SELECT count(*)::int AS n FROM question_attempts WHERE student_id=$1 AND request_id=$2",[student.student_id,conflictingKey]);
  assert.equal(conflictingAttempts.rows[0].n,1);
+ const conflictEvents=await pool.query("SELECT count(*)::int AS n FROM outbox_events o JOIN question_attempts a ON a.attempt_id=o.aggregate_id WHERE a.student_id=$1 AND a.request_id=$2 AND o.event_type='AttemptRecorded'",[student.student_id,conflictingKey]);
+ assert.equal(conflictEvents.rows[0].n,1);
  await pool.query("UPDATE daily_tasks SET status='Completed' WHERE daily_task_id=$1",[task.daily_task_id]);
  const replay=await svc.submit(student.student_id,{...input,answer_payload:{choice_index:1}},requestId);
  assert.equal(replay.attempt_id,first.attempt_id);assert.equal(replay.explanation_payload.text,"goes is correct");
