@@ -53,6 +53,10 @@ it("returns only a different, published and human-approved question without answ
  assert.equal(report.eligible_attempt_count,1);
  assert.equal(report.wrong_count,1);
  assert.ok(report.reasons.includes("CAUSE_ADJUDICATION_POLICY_NOT_APPROVED"));
+ assert.equal(report.correct_count,0);
+ assert.equal(report.wrong_count,1);
+ assert.equal(report.cause_status,"Candidate");
+ assert.equal(Number((await p.query("SELECT count(*) n FROM micro_repair_tasks WHERE student_id=$1",[student.student_id])).rows[0].n),0);
  assert.equal(await new CauseEvidenceAuditReadModel(p).forCause(other.student_id,h.error_cause_hypothesis_id),null);
  const unrelated=(await p.query("INSERT INTO knowledge_points(level,domain,code,name) VALUES(1,'Grammar',$1,'unrelated knowledge') RETURNING knowledge_id",["VQ-UNRELATED-"+crypto.randomUUID()])).rows[0];
  const foreignItem=(await p.query("INSERT INTO content_items(content_type,source_type,status) VALUES('Choice','Research','Published') RETURNING content_id")).rows[0];
