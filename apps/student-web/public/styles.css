@@ -12,3 +12,35 @@ body[data-stage="High"]{--primary:#164a8d;--dark:#103b79;--wash:#e5effb;--accent
 
 .hidden{display:none!important}.player{position:fixed;inset:0;background:#f6f8fc;z-index:10;overflow:auto;padding:28px}.lesson{max-width:720px;margin:30px auto}.lesson-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}.back{background:transparent;color:#66728a;padding:8px}.question-card{background:white;border:1px solid #e5eaf2;border-radius:26px;padding:32px;box-shadow:0 18px 50px rgba(30,48,80,.07)}.question-card h2{font-size:27px;line-height:1.45}.options{display:grid;gap:12px;margin:24px 0}.option{background:#f7f9fc;color:#26344f;text-align:left;border:1px solid #e1e7f0;padding:16px 18px}.option:hover{border-color:#9bb4df}.option.correct{background:#eef8f1;border-color:#8cc49c}.option.wrong{background:#fff1f0;border-color:#e8a5a0}.feedback-box{margin-top:22px;padding:20px;border-radius:18px;background:#f4f7fc;line-height:1.7}.repair-box{margin-top:18px;padding:22px;border-radius:18px;background:#fff7e9}.primary-wide{width:100%;margin-top:18px}.micro{color:#78849a;font-size:13px}.success{text-align:center;padding:50px 20px}.success .check{font-size:50px}.success h2{font-size:30px}@media(max-width:640px){.player{padding:12px}.lesson{margin:12px auto}.question-card{padding:22px}.question-card h2{font-size:23px}}
 
+
+
+/* Sprint 11 / Home visual refresh phase 1: shared layout, stage-specific surfaces.
+   Learning flows, assessment and API contracts are intentionally unchanged. */
+:root{--surface-tint:#f4f8ff;--stage-shadow:rgba(28,74,123,.07)}
+body[data-stage="Primary"]{--surface-tint:#fff9f0;--stage-shadow:rgba(145,91,32,.07)}
+body[data-stage="Middle"]{--surface-tint:#f2f8ff;--stage-shadow:rgba(35,93,159,.07)}
+body[data-stage="High"]{--surface-tint:#f3f6fa;--stage-shadow:rgba(27,50,79,.055);--primary:#244f83;--dark:#203955;--accent:#adbacd}
+.shell{background:linear-gradient(180deg,var(--wash) 0,var(--surface-tint) 280px,var(--surface-tint) 100%);padding-bottom:116px}
+.welcome{min-height:180px;padding:30px 8px 22px}
+.welcome h1{font-size:clamp(23px,5vw,28px);letter-spacing:0;font-weight:800}
+.welcome-art{background:radial-gradient(circle at 48% 58%,#fff 0 38%,rgba(255,255,255,.4) 39% 67%,transparent 68%);width:104px;flex-basis:104px}
+body[data-stage="High"] .welcome-art{background:linear-gradient(140deg,#e7edf6,#fff);border-radius:24px;width:94px;height:94px;flex-basis:94px}
+body[data-stage="High"] .welcome-illustration{font-size:45px;filter:none}
+.hero{border-radius:25px;padding:24px 23px 22px;box-shadow:0 12px 32px var(--stage-shadow)}
+body[data-stage="Primary"] .hero{border-color:#fae7c8}
+body[data-stage="High"] .hero{border-color:#e2e8f0;box-shadow:0 7px 22px var(--stage-shadow)}
+.hero h2{margin-top:17px}.hero-progress{margin-top:22px}
+.start-button{background:var(--primary);box-shadow:0 8px 18px var(--stage-shadow);border-radius:15px}
+.stats{margin:17px 0 29px;gap:12px}
+.stats article{border-radius:18px;padding:15px 5px;box-shadow:none;border-color:rgba(132,152,183,.13)}
+.learning-section{margin:29px 0}.section-title{margin-bottom:15px}.section-title h3{font-size:18px}
+.task{border-radius:18px;padding:16px;box-shadow:none}
+.task .num{border-radius:14px}
+.quiet-card{box-shadow:none;border-radius:18px}
+.goal-section .quiet-symbol{background:#edf2ff;color:var(--primary)}
+body[data-stage="Primary"] .goal-section .quiet-symbol{background:#fff0d9}
+body[data-stage="High"] .goal-section .quiet-symbol{background:#e9eef5}
+.bottom-nav{margin-bottom:-116px;border-radius:20px 20px 0 0;box-shadow:0 -7px 22px rgba(26,54,90,.04)}
+.nav-item{border-radius:12px}.nav-item:focus-visible,.start-button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+@media(max-width:380px){.welcome{min-height:158px}.welcome-art{width:78px;flex-basis:78px}.hero{padding:19px}.stats{gap:7px}.stats article{padding:13px 2px}}
+@media(prefers-reduced-motion:reduce){.progress-fill{transition:none}}
