@@ -65,3 +65,7 @@ The real API now exposes `GET /api/v1/students/:studentId/feedback/causes/:hypot
 ## Independent confirmation answer, evidence-only slice
 
 The authorized student may now POST `/api/v1/students/:studentId/feedback/causes/:hypothesisId/question/answer` with an idempotency key, approved `content_version_id` and `answer_payload`. The API grades it using the server-held answer key and persists a `question_attempts` record with `exposure_type=Verification`. The student UI can display the independent question after real wrong-answer review. A grading response **does not** set the hypothesis to Verified/Rejected or create a MicroRepair task. The legacy student-facing verification mutation also rejects direct `Supports` / `Contradicts` claims without trusted server evidence. Future work must securely associate independently graded attempts with cause evidence before any cause status transitions or personalized repair planning. This is not a full error-cause verification loop yet.
+
+## Pending confirmation evidence association
+
+The independently graded verification attempt is now linked to its originating cause hypothesis through a nullable-result `error_cause_verifications` Question record. The same attempt cannot be linked to two different hypotheses. A replay reuses the original record. Its `result` stays `NULL`: an answer graded Correct/Wrong is not, by itself, a trusted Supports/Contradicts verdict, and neither the cause state nor MicroRepair eligibility changes here. Subsequent evidence adjudication requires explicit documented rules and tests.
