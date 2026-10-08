@@ -44,7 +44,7 @@ try{
   assert.equal(await page.locator("#tasks .task").count(),2);
  assert.equal(await page.locator("#progress-fill").getAttribute("style"),"width: 0%;");
  await page.getByText("待学习",{exact:true}).first().waitFor();
- await page.getByRole("button",{name:"开始今日学习"}).click();
+ await page.locator("#start").click();
  await page.getByRole("heading",{name:"My brother ___ football."}).waitFor();
  await page.locator(".option").nth(1).click();
  await page.getByText("答对了").waitFor();
@@ -74,7 +74,7 @@ try{
  const wrongPage=await browser.newPage();
  const wrongErrors=[];wrongPage.on("pageerror",e=>wrongErrors.push(e.message));
  await wrongPage.goto(`http://127.0.0.1:${webPort}/?student=${wrongFixture.studentId}&user=${wrongFixture.userId}&date=${date}`);
- await wrongPage.getByRole("button",{name:"开始今日学习"}).click();
+ await wrongPage.locator("#start").click();
  await wrongPage.getByRole("heading",{name:"My brother ___ football."}).waitFor();
  await wrongPage.locator(".option").nth(0).click();
  await wrongPage.getByText("这里卡了一下").waitFor();
@@ -137,7 +137,7 @@ try{
  const recoveryPage=await browser.newPage();
  const recoveryErrors=[];recoveryPage.on("pageerror",e=>recoveryErrors.push(e.message));
  await recoveryPage.goto(`http://127.0.0.1:${webPort}/?student=${recoveryFixture.studentId}&user=${recoveryFixture.userId}&date=${date}`);
- await recoveryPage.getByRole("button",{name:"开始今日学习"}).click();
+ await recoveryPage.locator("#start").click();
  await recoveryPage.getByRole("heading",{name:"My brother ___ football."}).waitFor();
  await recoveryPage.locator(".option").nth(0).click();
  await recoveryPage.getByText("这里卡了一下").waitFor();
@@ -154,7 +154,7 @@ try{
  const beforeReload=(await pool.query("SELECT attempt_id,request_id FROM question_attempts WHERE student_id=$1 AND exposure_type='Verification'",[recoveryFixture.studentId])).rows;
  assert.equal(beforeReload.length,1);
  await recoveryPage.reload();
- await recoveryPage.getByRole("button",{name:"开始今日学习"}).click();
+ await recoveryPage.locator("#start").click();
  await recoveryPage.getByRole("heading",{name:"恢复确认练习"}).waitFor();
  await recoveryPage.getByRole("button",{name:"重试原确认题答案"}).click();
  await recoveryPage.getByRole("heading",{name:"确认练习已恢复"}).waitFor();
